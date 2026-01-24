@@ -1,0 +1,46 @@
+import { Card, Suit } from './card';
+import { Room, Player } from './room';
+import { GameState } from './game';
+
+// クライアント → サーバー
+export interface ClientToServerEvents {
+  'room:create': (data: { roomId: string; playerName: string; jokerCount?: number; rate?: number; myMark: Suit }) => void;
+  'room:join': (data: { roomId: string; playerName: string; myMark: Suit }) => void;
+  'room:leave': (data: { roomId: string }) => void;
+  'game:start': (data: { roomId: string }) => void;
+  'game:playCard': (data: { roomId: string; cardIds: string[] }) => void;
+  'game:drawCard': (data: { roomId: string }) => void;
+  'game:pass': (data: { roomId: string }) => void;
+  'game:dobon': (data: { roomId: string }) => void;
+  'game:skipDobon': (data: { roomId: string }) => void;
+  'game:backToLobby': (data: { roomId: string }) => void;
+}
+
+// サーバー → クライアント
+export interface ServerToClientEvents {
+  'room:created': (data: { room: Room; playerId: string }) => void;
+  'room:joined': (data: { room: Room; playerId: string }) => void;
+  'room:updated': (data: { room: Room }) => void;
+  'room:playerJoined': (data: { player: Player }) => void;
+  'room:playerLeft': (data: { playerId: string }) => void;
+  'room:deleted': () => void;
+  'room:error': (data: { message: string }) => void;
+  'game:started': (data: { gameState: GameState }) => void;
+  'game:stateUpdate': (data: { gameState: GameState }) => void;
+  'game:cardPlayed': (data: { playerId: string; card: Card }) => void;
+  'game:cardDrawn': (data: { playerId: string; card?: Card }) => void;
+  'game:finished': (data: { winnerId: string; winnerName: string }) => void;
+  'game:backToLobby': () => void;
+  'game:error': (data: { message: string }) => void;
+}
+
+// Socket.ioの型付きソケット用
+export interface InterServerEvents {
+  ping: () => void;
+}
+
+export interface SocketData {
+  roomId?: string;
+  playerId?: string;
+  playerName?: string;
+}
