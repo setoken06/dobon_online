@@ -1,5 +1,5 @@
 import { Card, canPlayCard, isJokerCard, Suit } from '../../src/types/card';
-import { GameState, PlayerGameState, GAME_CONFIG } from '../../src/types/game';
+import { GameState, PlayerGameState, GAME_CONFIG, WinnerInfo, InitialRateBonus } from '../../src/types/game';
 import { Player, MyMark } from '../../src/types/room';
 import { Deck } from './Deck';
 
@@ -11,6 +11,13 @@ interface InternalPlayerState {
   myMark?: MyMark;
 }
 
+// ドボンしたプレイヤー情報
+interface DobonPlayerInfo {
+  playerId: string;
+  playerName: string;
+  handCount: number;
+}
+
 export class GameManager {
   private roomId: string;
   private deck: Deck;
@@ -18,13 +25,19 @@ export class GameManager {
   private discardPile: Card[] = [];
   private currentPlayerIndex: number = 0;
   private hasDrawnThisTurn: boolean = false;
-  private winnerId?: string;
-  private winnerName?: string;
-  private winnerHandCount?: number;
+  private winners: WinnerInfo[] = [];
   private dobonablePlayerIds: Set<string> = new Set();
+  private playersWhoDoboned: Map<string, DobonPlayerInfo> = new Map();
+  private playersWhoSkippedDobon: Set<string> = new Set();
   private rate: number;
   private lastDrawCards: Card[] = [];
-  private finalScore?: number;
+  // ドボン返し関連
+  private dobonGaeshiEligiblePlayerIds: Set<string> = new Set();
+  private dobonTriggerPlayerId?: string; // カードを出したプレイヤー（ドボン返し対象）
+  private dobonCardValue?: number;
+  // 初期レートボーナス関連
+  private initialRateBonuses: InitialRateBonus[] = [];
+  private waitingForInitialRateConfirm: boolean = false;
 
   constructor(roomId: string, players: Player[], jokerCount: number = 0, initialRate: number = 100) {
     this.roomId = roomId;
@@ -60,10 +73,20 @@ export class GameManager {
       // ジョーカーならレート*2
       if (isJokerCard(firstCard)) {
         this.rate *= 2;
+        this.initialRateBonuses.push({
+          type: 'joker',
+          card: firstCard,
+          multiplier: 2,
+        });
       } else {
         // マイマークと一致ならレート*2
         if (firstPlayer.myMark && firstCard.suit === firstPlayer.myMark) {
           this.rate *= 2;
+          this.initialRateBonuses.push({
+            type: 'myMark',
+            card: firstCard,
+            multiplier: 2,
+          });
         }
       }
 
@@ -75,16 +98,31 @@ export class GameManager {
           // ジョーカーならレート*2
           if (isJokerCard(nextCard)) {
             this.rate *= 2;
+            this.initialRateBonuses.push({
+              type: 'joker',
+              card: nextCard,
+              multiplier: 2,
+            });
           } else {
             // マイマークと一致ならレート*2
             if (firstPlayer.myMark && nextCard.suit === firstPlayer.myMark) {
               this.rate *= 2;
+              this.initialRateBonuses.push({
+                type: 'myMark',
+                card: nextCard,
+                multiplier: 2,
+              });
             }
           }
         } else {
           break;
         }
       }
+    }
+
+    // 初期レートボーナスがあれば確認待ち状態にする
+    if (this.initialRateBonuses.length > 0) {
+      this.waitingForInitialRateConfirm = true;
     }
   }
 
@@ -227,6 +265,7 @@ export class GameManager {
     }));
 
     const canDobon = this.dobonablePlayerIds.has(playerId);
+    const canDobonGaeshi = this.dobonGaeshiEligiblePlayerIds.has(playerId);
 
     // リーチ状態なら待ち数字を計算（自分のみ）
     let winningNumbers: number[] | undefined;
@@ -242,9 +281,16 @@ export class GameManager {
     const topCard = this.getTopCard();
     const effectiveTopCard = isJokerCard(topCard) ? this.getEffectiveTopCard() : undefined;
 
+    // ドボンしたプレイヤー情報（ドボン返し時に表示用）
+    const dobonPlayerIds = Array.from(this.playersWhoDoboned.keys());
+    const dobonPlayerNames = Array.from(this.playersWhoDoboned.values()).map(p => p.playerName);
+
+    // 後方互換性のための単独勝者情報
+    const firstWinner = this.winners.length > 0 ? this.winners[0] : undefined;
+
     return {
       roomId: this.roomId,
-      status: this.winnerId ? 'finished' : 'playing',
+      status: this.winners.length > 0 ? 'finished' : 'playing',
       players: playerStates,
       currentPlayerId: this.getCurrentPlayer().playerId,
       topCard,
@@ -252,14 +298,31 @@ export class GameManager {
       deckCount: this.deck.remaining(),
       hasDrawnThisTurn: this.hasDrawnThisTurn,
       canDobon,
+      canDobonGaeshi,
       winningNumbers,
       mustPlayCard,
-      winnerId: this.winnerId,
-      winnerName: this.winnerName,
+      // 複数勝者対応
+      winners: this.winners.length > 0 ? this.winners : undefined,
+      // 後方互換性
+      winnerId: firstWinner?.playerId,
+      winnerName: firstWinner?.playerName,
+      finalScore: firstWinner?.finalScore,
+      winnerHandCount: firstWinner?.handCount,
       rate: this.rate,
       lastDrawCards: this.lastDrawCards.length > 0 ? this.lastDrawCards : undefined,
-      finalScore: this.finalScore,
-      winnerHandCount: this.winnerHandCount,
+      // ドボン返し関連
+      dobonPlayerIds: dobonPlayerIds.length > 0 ? dobonPlayerIds : undefined,
+      dobonPlayerNames: dobonPlayerNames.length > 0 ? dobonPlayerNames : undefined,
+      // 後方互換性（単独ドボン時用）
+      dobonPlayerId: dobonPlayerIds.length > 0 ? dobonPlayerIds[0] : undefined,
+      dobonPlayerName: dobonPlayerNames.length > 0 ? dobonPlayerNames[0] : undefined,
+      // 初期レートボーナス関連
+      initialRateBonuses: this.initialRateBonuses.length > 0 ? this.initialRateBonuses : undefined,
+      waitingForInitialRateConfirm: this.waitingForInitialRateConfirm,
+      initialRateConfirmPlayerId: this.waitingForInitialRateConfirm ? this.getCurrentPlayer().playerId : undefined,
+      // ドボン待機関連
+      isWaitingForDobon: this.dobonablePlayerIds.size > 0,
+      isWaitingForDobonGaeshi: this.dobonGaeshiEligiblePlayerIds.size > 0,
     };
   }
 
@@ -280,6 +343,11 @@ export class GameManager {
 
   // カードを出す（複数枚対応：同じ数字なら2枚まで同時に出せる）
   playCards(playerId: string, cardIds: string[]): { success: boolean; error?: string } {
+    // 初期レート確認待ちの場合はカードを出せない
+    if (this.waitingForInitialRateConfirm) {
+      return { success: false, error: '初期レートの確認を待っています' };
+    }
+
     const currentPlayer = this.getCurrentPlayer();
     if (currentPlayer.playerId !== playerId) {
       return { success: false, error: 'あなたのターンではありません' };
@@ -289,8 +357,8 @@ export class GameManager {
       return { success: false, error: 'カードを選択してください' };
     }
 
-    if (cardIds.length > 2) {
-      return { success: false, error: '同時に出せるのは2枚までです' };
+    if (cardIds.length > 4) {
+      return { success: false, error: '同時に出せるのは4枚までです' };
     }
 
     // カードを取得
@@ -303,12 +371,13 @@ export class GameManager {
       cards.push(card);
     }
 
-    // 2枚の場合、同じ数字かチェック（ジョーカーは単独でしか出せない）
-    if (cards.length === 2) {
+    // 複数枚の場合、同じ数字かチェック（ジョーカーは単独でしか出せない）
+    if (cards.length >= 2) {
       if (cards.some(c => isJokerCard(c))) {
         return { success: false, error: 'ジョーカーは1枚ずつしか出せません' };
       }
-      if (cards[0].rank !== cards[1].rank) {
+      const firstRank = cards[0].rank;
+      if (!cards.every(c => c.rank === firstRank)) {
         return { success: false, error: '同時に出せるのは同じ数字のカードのみです' };
       }
     }
@@ -328,8 +397,17 @@ export class GameManager {
       this.discardPile.push(card);
     }
 
+    // カードを出した後、リーチ状態を更新（ドボン返し判定のため）
+    if (this.checkReachCondition(currentPlayer.hand)) {
+      currentPlayer.isReach = true;
+    } else {
+      currentPlayer.isReach = false;
+    }
+
     // ドボン可能なプレイヤーをチェック（最後に出したカードの数字で判定）
     this.dobonablePlayerIds.clear();
+    this.playersWhoDoboned.clear();
+    this.playersWhoSkippedDobon.clear();
     const lastCard = cards[cards.length - 1];
     const cardValue = this.getCardValue(lastCard);
 
@@ -342,8 +420,14 @@ export class GameManager {
       }
     }
 
-    // ドボン可能なプレイヤーがいなければ次のターンへ
-    if (this.dobonablePlayerIds.size === 0) {
+    // ドボン可能なプレイヤーがいる場合、トリガープレイヤーを記録
+    if (this.dobonablePlayerIds.size > 0) {
+      this.dobonTriggerPlayerId = playerId;
+      this.dobonCardValue = cardValue;
+    } else {
+      // ドボン可能なプレイヤーがいなければ次のターンへ
+      this.dobonTriggerPlayerId = undefined;
+      this.dobonCardValue = undefined;
       this.nextTurn();
     }
 
@@ -352,6 +436,11 @@ export class GameManager {
 
   // カードを引く
   drawCard(playerId: string): { success: boolean; card?: Card; error?: string; mustDrawAgain?: boolean; mustPlayJoker?: boolean } {
+    // 初期レート確認待ちの場合はカードを引けない
+    if (this.waitingForInitialRateConfirm) {
+      return { success: false, error: '初期レートの確認を待っています' };
+    }
+
     const currentPlayer = this.getCurrentPlayer();
     if (currentPlayer.playerId !== playerId) {
       return { success: false, error: 'あなたのターンではありません' };
@@ -433,8 +522,8 @@ export class GameManager {
     return { success: true };
   }
 
-  // ドボン
-  dobon(playerId: string): { success: boolean; error?: string } {
+  // ドボン（全員が選択完了後に勝敗決定）
+  dobon(playerId: string): { success: boolean; error?: string; allResponded?: boolean } {
     if (!this.dobonablePlayerIds.has(playerId)) {
       return { success: false, error: 'ドボンできません' };
     }
@@ -444,15 +533,146 @@ export class GameManager {
       return { success: false, error: 'プレイヤーが見つかりません' };
     }
 
-    // 勝者の手札枚数を保存
-    this.winnerHandCount = player.hand.length;
+    // ドボンを選択
+    this.playersWhoDoboned.set(playerId, {
+      playerId,
+      playerName: player.playerName,
+      handCount: player.hand.length,
+    });
+    this.dobonablePlayerIds.delete(playerId);
 
-    // ラストドロー実行
+    // 全員が選択完了したかチェック
+    if (this.dobonablePlayerIds.size === 0) {
+      return this.resolveDobonPhase();
+    }
+
+    return { success: true, allResponded: false };
+  }
+
+  // ドボンをスキップ
+  skipDobon(playerId: string): { success: boolean; error?: string; allResponded?: boolean } {
+    if (!this.dobonablePlayerIds.has(playerId)) {
+      return { success: false, error: 'ドボンの権利がありません' };
+    }
+
+    this.playersWhoSkippedDobon.add(playerId);
+    this.dobonablePlayerIds.delete(playerId);
+
+    // 全員が選択完了したかチェック
+    if (this.dobonablePlayerIds.size === 0) {
+      return this.resolveDobonPhase();
+    }
+
+    return { success: true, allResponded: false };
+  }
+
+  // 全員のドボン選択完了後の処理
+  private resolveDobonPhase(): { success: boolean; allResponded: boolean } {
+    // 誰もドボンしなかった場合
+    if (this.playersWhoDoboned.size === 0) {
+      this.dobonTriggerPlayerId = undefined;
+      this.dobonCardValue = undefined;
+      this.nextTurn();
+      return { success: true, allResponded: true };
+    }
+
+    // ドボン返しチェック（カードを出したプレイヤーがドボン返しできるか）
+    if (this.dobonTriggerPlayerId && this.dobonCardValue) {
+      const triggerPlayer = this.findPlayer(this.dobonTriggerPlayerId);
+      if (triggerPlayer &&
+          triggerPlayer.isReach &&
+          this.checkDobonCondition(this.dobonTriggerPlayerId, this.dobonCardValue)) {
+        // ドボン返し可能
+        this.dobonGaeshiEligiblePlayerIds.add(this.dobonTriggerPlayerId);
+        return { success: true, allResponded: true };
+      }
+    }
+
+    // ドボン返しできない場合、ドボンしたプレイヤー全員が勝利
+    this.finalizeMultipleWinners();
+    return { success: true, allResponded: true };
+  }
+
+  // 複数勝者の確定処理
+  private finalizeMultipleWinners(): void {
     this.performLastDraw();
 
-    this.winnerId = playerId;
-    this.winnerName = player.playerName;
-    this.dobonablePlayerIds.clear();
+    const lastNonJokerCard = this.lastDrawCards.find(c => !isJokerCard(c));
+    const lastDrawValue = lastNonJokerCard ? this.getCardValue(lastNonJokerCard) : 0;
+
+    this.winners = [];
+    for (const [, dobonInfo] of this.playersWhoDoboned) {
+      const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
+      const score = this.rate * lastDrawValue * handCountMultiplier;
+      this.winners.push({
+        playerId: dobonInfo.playerId,
+        playerName: dobonInfo.playerName,
+        handCount: dobonInfo.handCount,
+        finalScore: score,
+      });
+    }
+
+    // クリア
+    this.playersWhoDoboned.clear();
+    this.playersWhoSkippedDobon.clear();
+    this.dobonTriggerPlayerId = undefined;
+    this.dobonCardValue = undefined;
+  }
+
+  // ドボン返し
+  dobonGaeshi(playerId: string): { success: boolean; error?: string } {
+    if (!this.dobonGaeshiEligiblePlayerIds.has(playerId)) {
+      return { success: false, error: 'ドボン返しできません' };
+    }
+
+    const player = this.findPlayer(playerId);
+    if (!player) {
+      return { success: false, error: 'プレイヤーが見つかりません' };
+    }
+
+    // ドボン返し成功：手札枚数は自分の手札 + ドボンした全プレイヤーの手札
+    let totalDobonHandCount = 0;
+    for (const [, dobonInfo] of this.playersWhoDoboned) {
+      totalDobonHandCount += dobonInfo.handCount;
+    }
+    const combinedHandCount = player.hand.length + totalDobonHandCount;
+
+    this.performLastDraw();
+
+    const lastNonJokerCard = this.lastDrawCards.find(c => !isJokerCard(c));
+    const lastDrawValue = lastNonJokerCard ? this.getCardValue(lastNonJokerCard) : 0;
+    const handCountMultiplier = this.getHandCountMultiplier(combinedHandCount);
+    const score = this.rate * lastDrawValue * handCountMultiplier;
+
+    this.winners = [{
+      playerId: player.playerId,
+      playerName: player.playerName,
+      handCount: combinedHandCount,
+      finalScore: score,
+    }];
+
+    // クリア
+    this.dobonGaeshiEligiblePlayerIds.clear();
+    this.playersWhoDoboned.clear();
+    this.playersWhoSkippedDobon.clear();
+    this.dobonTriggerPlayerId = undefined;
+    this.dobonCardValue = undefined;
+
+    return { success: true };
+  }
+
+  // ドボン返しをスキップ
+  skipDobonGaeshi(playerId: string): { success: boolean; error?: string } {
+    if (!this.dobonGaeshiEligiblePlayerIds.has(playerId)) {
+      return { success: false, error: 'ドボン返しの権利がありません' };
+    }
+
+    this.dobonGaeshiEligiblePlayerIds.delete(playerId);
+
+    // ドボン返しがスキップされたら、ドボンしたプレイヤー全員が勝利
+    if (this.dobonGaeshiEligiblePlayerIds.size === 0) {
+      this.finalizeMultipleWinners();
+    }
 
     return { success: true };
   }
@@ -492,37 +712,56 @@ export class GameManager {
         break;
       }
     }
-
-    // 最終スコア計算: レート × ラストドローの数字 × 勝者の手札枚数
-    const lastNonJokerCard = this.lastDrawCards.find(c => !isJokerCard(c));
-    const lastDrawValue = lastNonJokerCard ? this.getCardValue(lastNonJokerCard) : 0;
-    this.finalScore = this.rate * lastDrawValue * (this.winnerHandCount || 1);
   }
 
-  // ドボンをスキップ
-  skipDobon(playerId: string): { success: boolean; error?: string } {
-    if (!this.dobonablePlayerIds.has(playerId)) {
-      return { success: false, error: 'ドボンの権利がありません' };
-    }
-
-    this.dobonablePlayerIds.delete(playerId);
-
-    if (this.dobonablePlayerIds.size === 0) {
-      this.nextTurn();
-    }
-
-    return { success: true };
+  // 手札枚数に応じた倍率を取得
+  private getHandCountMultiplier(handCount: number): number {
+    if (handCount === 1) return 2;  // 1枚 = 2倍
+    if (handCount === 2) return 1;  // 2枚 = 1倍
+    return handCount;               // 3枚以上 = 枚数倍
   }
 
-  getWinner(): { winnerId?: string; winnerName?: string } {
-    return { winnerId: this.winnerId, winnerName: this.winnerName };
+  getWinner(): { winnerId?: string; winnerName?: string; winners?: WinnerInfo[] } {
+    if (this.winners.length === 0) {
+      return {};
+    }
+    // 後方互換性のため単独勝者の場合は winnerId/winnerName も返す
+    const firstWinner = this.winners[0];
+    return {
+      winnerId: firstWinner.playerId,
+      winnerName: firstWinner.playerName,
+      winners: this.winners,
+    };
   }
 
   isGameOver(): boolean {
-    return !!this.winnerId;
+    return this.winners.length > 0;
   }
 
   isWaitingForDobon(): boolean {
     return this.dobonablePlayerIds.size > 0;
+  }
+
+  isWaitingForDobonGaeshi(): boolean {
+    return this.dobonGaeshiEligiblePlayerIds.size > 0;
+  }
+
+  isWaitingForInitialRateConfirm(): boolean {
+    return this.waitingForInitialRateConfirm;
+  }
+
+  // 初期レートボーナス確認
+  confirmInitialRate(playerId: string): { success: boolean; error?: string } {
+    if (!this.waitingForInitialRateConfirm) {
+      return { success: false, error: '確認待ちではありません' };
+    }
+
+    const currentPlayer = this.getCurrentPlayer();
+    if (currentPlayer.playerId !== playerId) {
+      return { success: false, error: '最初の手番プレイヤーのみ確認できます' };
+    }
+
+    this.waitingForInitialRateConfirm = false;
+    return { success: true };
   }
 }

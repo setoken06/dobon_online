@@ -13,7 +13,7 @@ import { Player } from '../src/types/room';
 import { GameManager } from './game/GameManager';
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = '0.0.0.0';  // 本番環境では0.0.0.0にバインド
 const port = parseInt(process.env.PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
@@ -241,14 +241,16 @@ app.prepare().then(() => {
         // 全プレイヤーに状態を送信
         broadcastGameState(io, roomId, game);
 
-        // 勝利通知
-        const { winnerId, winnerName } = game.getWinner();
-        if (winnerId && winnerName) {
-          io.to(roomId).emit('game:finished', { winnerId, winnerName });
-          roomStore.setRoomStatus(roomId, 'finished');
+        // 全員が選択完了した場合、勝利通知（ドボン返しがなければ）
+        if (result.allResponded && game.isGameOver()) {
+          const { winnerId, winnerName, winners } = game.getWinner();
+          if (winnerId && winnerName) {
+            io.to(roomId).emit('game:finished', { winnerId, winnerName });
+            roomStore.setRoomStatus(roomId, 'finished');
+            const winnerNames = winners?.map(w => w.playerName).join(', ') || winnerName;
+            console.log(`Dobon! ${winnerNames} won in room: ${roomId}`);
+          }
         }
-
-        console.log(`Dobon! ${socket.data.playerName} won in room: ${roomId}`);
       } catch (error) {
         socket.emit('game:error', {
           message: error instanceof Error ? error.message : 'エラーが発生しました'
@@ -273,6 +275,109 @@ app.prepare().then(() => {
 
         // 全プレイヤーに状態を送信
         broadcastGameState(io, roomId, game);
+
+        // 全員が選択完了した場合、勝利通知（ドボン返しがなければ）
+        if (result.allResponded && game.isGameOver()) {
+          const { winnerId, winnerName, winners } = game.getWinner();
+          if (winnerId && winnerName) {
+            io.to(roomId).emit('game:finished', { winnerId, winnerName });
+            roomStore.setRoomStatus(roomId, 'finished');
+            const winnerNames = winners?.map(w => w.playerName).join(', ') || winnerName;
+            console.log(`Dobon! ${winnerNames} won in room: ${roomId}`);
+          }
+        }
+      } catch (error) {
+        socket.emit('game:error', {
+          message: error instanceof Error ? error.message : 'エラーが発生しました'
+        });
+      }
+    });
+
+    // ドボン返し
+    socket.on('game:dobonGaeshi', ({ roomId }) => {
+      try {
+        const game = roomStore.getGame(roomId);
+        if (!game) {
+          socket.emit('game:error', { message: 'ゲームが見つかりません' });
+          return;
+        }
+
+        const result = game.dobonGaeshi(socket.id);
+        if (!result.success) {
+          socket.emit('game:error', { message: result.error || 'ドボン返しできませんでした' });
+          return;
+        }
+
+        // 全プレイヤーに状態を送信
+        broadcastGameState(io, roomId, game);
+
+        // 勝利通知
+        const { winnerId, winnerName } = game.getWinner();
+        if (winnerId && winnerName) {
+          io.to(roomId).emit('game:finished', { winnerId, winnerName });
+          roomStore.setRoomStatus(roomId, 'finished');
+        }
+
+        console.log(`Dobon Gaeshi! ${socket.data.playerName} won in room: ${roomId}`);
+      } catch (error) {
+        socket.emit('game:error', {
+          message: error instanceof Error ? error.message : 'エラーが発生しました'
+        });
+      }
+    });
+
+    // ドボン返しをスキップ
+    socket.on('game:skipDobonGaeshi', ({ roomId }) => {
+      try {
+        const game = roomStore.getGame(roomId);
+        if (!game) {
+          socket.emit('game:error', { message: 'ゲームが見つかりません' });
+          return;
+        }
+
+        const result = game.skipDobonGaeshi(socket.id);
+        if (!result.success) {
+          socket.emit('game:error', { message: result.error || 'スキップできませんでした' });
+          return;
+        }
+
+        // 全プレイヤーに状態を送信
+        broadcastGameState(io, roomId, game);
+
+        // ドボン返しがスキップされて元のドボンが成立した場合、勝利通知
+        if (game.isGameOver()) {
+          const { winnerId, winnerName } = game.getWinner();
+          if (winnerId && winnerName) {
+            io.to(roomId).emit('game:finished', { winnerId, winnerName });
+            roomStore.setRoomStatus(roomId, 'finished');
+          }
+        }
+      } catch (error) {
+        socket.emit('game:error', {
+          message: error instanceof Error ? error.message : 'エラーが発生しました'
+        });
+      }
+    });
+
+    // 初期レートボーナス確認
+    socket.on('game:confirmInitialRate', ({ roomId }) => {
+      try {
+        const game = roomStore.getGame(roomId);
+        if (!game) {
+          socket.emit('game:error', { message: 'ゲームが見つかりません' });
+          return;
+        }
+
+        const result = game.confirmInitialRate(socket.id);
+        if (!result.success) {
+          socket.emit('game:error', { message: result.error || '確認できませんでした' });
+          return;
+        }
+
+        // 全プレイヤーに状態を送信
+        broadcastGameState(io, roomId, game);
+
+        console.log(`Initial rate confirmed in room: ${roomId}`);
       } catch (error) {
         socket.emit('game:error', {
           message: error instanceof Error ? error.message : 'エラーが発生しました'
@@ -354,7 +459,7 @@ app.prepare().then(() => {
     }
   }
 
-  httpServer.listen(port, () => {
+  httpServer.listen(port, hostname, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
   });
 });

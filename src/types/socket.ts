@@ -13,7 +13,10 @@ export interface ClientToServerEvents {
   'game:pass': (data: { roomId: string }) => void;
   'game:dobon': (data: { roomId: string }) => void;
   'game:skipDobon': (data: { roomId: string }) => void;
+  'game:dobonGaeshi': (data: { roomId: string }) => void;
+  'game:skipDobonGaeshi': (data: { roomId: string }) => void;
   'game:backToLobby': (data: { roomId: string }) => void;
+  'game:confirmInitialRate': (data: { roomId: string }) => void;
 }
 
 // サーバー → クライアント

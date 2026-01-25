@@ -22,7 +22,10 @@ interface UseSocketReturn {
   pass: () => void;
   dobon: () => void;
   skipDobon: () => void;
+  dobonGaeshi: () => void;
+  skipDobonGaeshi: () => void;
   backToLobby: () => void;
+  confirmInitialRate: () => void;
   clearError: () => void;
 }
 
@@ -178,9 +181,27 @@ export function useSocket(): UseSocketReturn {
     }
   }, [socket, room]);
 
+  const dobonGaeshi = useCallback(() => {
+    if (room) {
+      socket?.emit('game:dobonGaeshi', { roomId: room.id });
+    }
+  }, [socket, room]);
+
+  const skipDobonGaeshi = useCallback(() => {
+    if (room) {
+      socket?.emit('game:skipDobonGaeshi', { roomId: room.id });
+    }
+  }, [socket, room]);
+
   const backToLobby = useCallback(() => {
     if (room) {
       socket?.emit('game:backToLobby', { roomId: room.id });
+    }
+  }, [socket, room]);
+
+  const confirmInitialRate = useCallback(() => {
+    if (room) {
+      socket?.emit('game:confirmInitialRate', { roomId: room.id });
     }
   }, [socket, room]);
 
@@ -204,7 +225,10 @@ export function useSocket(): UseSocketReturn {
     pass,
     dobon,
     skipDobon,
+    dobonGaeshi,
+    skipDobonGaeshi,
     backToLobby,
+    confirmInitialRate,
     clearError,
   };
 }

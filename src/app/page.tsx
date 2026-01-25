@@ -21,7 +21,10 @@ export default function Home() {
     pass,
     dobon,
     skipDobon,
+    dobonGaeshi,
+    skipDobonGaeshi,
     backToLobby,
+    confirmInitialRate,
     clearError,
   } = useSocket();
 
@@ -45,7 +48,10 @@ export default function Home() {
         onPass={pass}
         onDobon={dobon}
         onSkipDobon={skipDobon}
+        onDobonGaeshi={dobonGaeshi}
+        onSkipDobonGaeshi={skipDobonGaeshi}
         onBackToLobby={backToLobby}
+        onConfirmInitialRate={confirmInitialRate}
       />
     );
   }

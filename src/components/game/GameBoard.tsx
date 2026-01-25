@@ -8,6 +8,8 @@ import { Deck } from './Deck';
 import { DiscardPile } from './DiscardPile';
 import { OpponentHand } from './OpponentHand';
 import { GameResult } from './GameResult';
+import { Card } from './Card';
+import { SUIT_SYMBOLS } from '../../types/card';
 
 interface GameBoardProps {
   gameState: GameState;
@@ -17,7 +19,10 @@ interface GameBoardProps {
   onPass: () => void;
   onDobon: () => void;
   onSkipDobon: () => void;
+  onDobonGaeshi: () => void;
+  onSkipDobonGaeshi: () => void;
   onBackToLobby: () => void;
+  onConfirmInitialRate: () => void;
 }
 
 export function GameBoard({
@@ -28,15 +33,24 @@ export function GameBoard({
   onPass,
   onDobon,
   onSkipDobon,
+  onDobonGaeshi,
+  onSkipDobonGaeshi,
   onBackToLobby,
+  onConfirmInitialRate,
 }: GameBoardProps) {
   const myPlayer = gameState.players.find((p) => p.playerId === playerId);
   const opponents = gameState.players.filter((p) => p.playerId !== playerId);
   const isMyTurn = gameState.currentPlayerId === playerId;
-  const canDraw = isMyTurn && !gameState.hasDrawnThisTurn;
   const isFinished = gameState.status === 'finished';
-  const isWinner = gameState.winnerId === playerId;
+  // 複数勝者対応：winnersに自分が含まれているか、または単独勝者が自分か
+  const isWinner = gameState.winners
+    ? gameState.winners.some(w => w.playerId === playerId)
+    : gameState.winnerId === playerId;
   const handCount = myPlayer?.hand?.length ?? 0;
+
+  // ドボン/ドボン返し待機中はアクション不可
+  const isWaitingForDobonAction = gameState.isWaitingForDobon || gameState.isWaitingForDobonGaeshi;
+  const canDraw = isMyTurn && !gameState.hasDrawnThisTurn && !isWaitingForDobonAction;
 
   // 選択中のカードID
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
@@ -47,8 +61,8 @@ export function GameBoard({
     return myPlayer.hand.some((card) => canPlayCard(card, gameState.topCard, gameState.effectiveTopCard));
   }, [myPlayer?.hand, gameState.topCard, gameState.effectiveTopCard]);
 
-  // パス可能かどうか（7枚以上で出せるカードがある場合は不可）
-  const canPass = isMyTurn && gameState.hasDrawnThisTurn && !gameState.mustPlayCard;
+  // パス可能かどうか（7枚以上で出せるカードがある場合は不可、ドボン待機中は不可）
+  const canPass = isMyTurn && gameState.hasDrawnThisTurn && !gameState.mustPlayCard && !isWaitingForDobonAction;
 
   // ターンが変わったら選択をリセット
   useEffect(() => {
@@ -57,8 +71,9 @@ export function GameBoard({
 
   // 出せるカードがない場合、自動的に1枚引く
   // 7枚以上で出せるカードがない場合も自動で引き続ける
+  // ドボン待機中は自動ドローしない
   useEffect(() => {
-    if (isMyTurn && gameState.status === 'playing') {
+    if (isMyTurn && gameState.status === 'playing' && !isWaitingForDobonAction) {
       // 出せるカードがない場合
       if (!hasPlayableCard) {
         const timer = setTimeout(() => {
@@ -67,7 +82,7 @@ export function GameBoard({
         return () => clearTimeout(timer);
       }
     }
-  }, [isMyTurn, gameState.hasDrawnThisTurn, hasPlayableCard, gameState.status, onDrawCard, handCount]);
+  }, [isMyTurn, gameState.hasDrawnThisTurn, hasPlayableCard, gameState.status, onDrawCard, handCount, isWaitingForDobonAction]);
 
   // 出せるカードのIDセット
   const playableCardIds = useMemo(() => {
@@ -100,18 +115,13 @@ export function GameBoard({
         return [cardId];
       }
 
-      // 2枚目の選択：同じランクのみ許可（1枚目が出せるカードなら2枚目は出せなくてもOK）
-      if (prev.length === 1) {
-        const firstCard = myPlayer.hand!.find(c => c.id === prev[0]);
-        if (firstCard && firstCard.rank === selectedCard.rank) {
-          return [...prev, cardId];
-        }
-        // 別のランクなら入れ替え（出せるカードのみ）
-        if (!isPlayable) return prev;
-        return [cardId];
+      // 2枚目以降の選択：同じランクのみ許可（最大4枚）
+      const firstCard = myPlayer.hand!.find(c => c.id === prev[0]);
+      if (firstCard && firstCard.rank === selectedCard.rank && prev.length < 4) {
+        return [...prev, cardId];
       }
 
-      // 2枚選択済みなら入れ替え（出せるカードのみ）
+      // 別のランクなら入れ替え（出せるカードのみ）
       if (!isPlayable) return prev;
       return [cardId];
     });
@@ -144,6 +154,8 @@ export function GameBoard({
           finalScore={gameState.finalScore}
           winnerHandCount={gameState.winnerHandCount}
           rate={gameState.rate}
+          winners={gameState.winners}
+          playerId={playerId}
         />
       )}
 
@@ -153,6 +165,46 @@ export function GameBoard({
         <span className="ml-2 text-xl font-bold text-yellow-400">{gameState.rate}</span>
       </div>
 
+      {/* 初期レートボーナス確認ポップアップ */}
+      {gameState.waitingForInitialRateConfirm && gameState.initialRateBonuses && gameState.initialRateBonuses.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40">
+          <div className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl p-8 shadow-2xl text-center max-w-md">
+            <h2 className="text-3xl font-bold text-white mb-4">レートアップ！</h2>
+            <div className="bg-white/20 rounded-lg p-4 mb-4">
+              {gameState.initialRateBonuses.map((bonus, index) => (
+                <div key={index} className="flex items-center justify-center gap-3 mb-3 last:mb-0">
+                  <Card card={bonus.card} size="sm" disabled />
+                  <div className="text-white text-left">
+                    {bonus.type === 'joker' ? (
+                      <p className="font-bold">ジョーカー出現！</p>
+                    ) : (
+                      <p className="font-bold">
+                        マイマーク一致！（{SUIT_SYMBOLS[bonus.card.suit]}）
+                      </p>
+                    )}
+                    <p className="text-sm">レート ×{bonus.multiplier}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-white text-2xl font-bold mb-4">
+              現在のレート: {gameState.rate}
+            </p>
+            {gameState.initialRateConfirmPlayerId === playerId ? (
+              <button
+                onClick={onConfirmInitialRate}
+                className="px-8 py-4 bg-white text-orange-600 font-bold text-xl rounded-lg hover:bg-gray-100 transition transform hover:scale-105"
+              >
+                確認
+              </button>
+            ) : (
+              <p className="text-white/80">
+                {gameState.players.find(p => p.playerId === gameState.initialRateConfirmPlayerId)?.playerName} の確認を待っています...
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ドボン可能時のオーバーレイ */}
       {gameState.canDobon && !isFinished && (
@@ -169,6 +221,44 @@ export function GameBoard({
               </button>
               <button
                 onClick={onSkipDobon}
+                className="px-8 py-4 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 transition"
+              >
+                スキップ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ドボン返し可能時のオーバーレイ */}
+      {gameState.canDobonGaeshi && !isFinished && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
+          <div className="bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl p-8 shadow-2xl text-center animate-pulse">
+            <h2 className="text-4xl font-bold text-white mb-4">ドボン返し！</h2>
+            {gameState.dobonPlayerNames && gameState.dobonPlayerNames.length > 1 ? (
+              <>
+                <p className="text-white/90 mb-2">
+                  {gameState.dobonPlayerNames.join(', ')} がドボンしました
+                </p>
+                <p className="text-white/90 mb-6">
+                  全員にドボン返しできます！（手札合計: あなた + {gameState.dobonPlayerNames.length}人分）
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-white/90 mb-2">{gameState.dobonPlayerName} がドボンしました</p>
+                <p className="text-white/90 mb-6">あなたも同じ数字で上がれます！</p>
+              </>
+            )}
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={onDobonGaeshi}
+                className="px-8 py-4 bg-white text-purple-600 font-bold text-xl rounded-lg hover:bg-gray-100 transition transform hover:scale-105"
+              >
+                ドボン返し！
+              </button>
+              <button
+                onClick={onSkipDobonGaeshi}
                 className="px-8 py-4 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 transition"
               >
                 スキップ
@@ -209,7 +299,7 @@ export function GameBoard({
       </div>
 
       {/* アクションボタン */}
-      {isMyTurn && (
+      {isMyTurn && !isWaitingForDobonAction && (
         <div className="flex flex-col items-center gap-3 mb-4">
           <div className="flex justify-center gap-4">
             {/* 選択したカードを出すボタン */}
@@ -218,7 +308,7 @@ export function GameBoard({
                 onClick={handlePlayCards}
                 className="px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition"
               >
-                {selectedCardIds.length === 1 ? 'カードを出す' : '2枚出す'}
+                {selectedCardIds.length === 1 ? 'カードを出す' : `${selectedCardIds.length}枚出す`}
               </button>
             )}
             {/* カードを引いていない場合：カードを引くボタン */}
@@ -258,7 +348,7 @@ export function GameBoard({
           )}
           {!gameState.hasDrawnThisTurn && hasPlayableCard && !gameState.mustPlayCard && (
             <span className="text-yellow-300 text-center">
-              カードを選択してください（同じ数字は2枚同時に出せます）
+              カードを選択してください（同じ数字は4枚まで同時に出せます）
             </span>
           )}
         </div>
