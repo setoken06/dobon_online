@@ -64,6 +64,8 @@ interface UseSocketReturn {
   socket: TypedSocket | null;
   isConnected: boolean;
   isReconnecting: boolean;
+  canRejoin: boolean;
+  rejoinInfo: { roomId: string; playerName: string } | null;
   room: Room | null;
   playerId: string | null;
   gameState: GameState | null;
@@ -71,6 +73,8 @@ interface UseSocketReturn {
   disconnectedPlayers: Map<string, string>;
   createRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit) => void;
   joinRoom: (roomId: string, playerName: string, myMark: Suit) => void;
+  rejoinRoom: () => void;
+  cancelRejoin: () => void;
   leaveRoom: () => void;
   startGame: () => void;
   playCards: (cardIds: string[]) => void;
@@ -89,28 +93,25 @@ export function useSocket(): UseSocketReturn {
   const [socket, setSocket] = useState<TypedSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [canRejoin, setCanRejoin] = useState(false);
+  const [rejoinInfo, setRejoinInfo] = useState<{ roomId: string; playerName: string } | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [disconnectedPlayers, setDisconnectedPlayers] = useState<Map<string, string>>(new Map());
   const lastSocketIdRef = useRef<string | null>(null);
-  const isReconnectingRef = useRef(false);
 
   useEffect(() => {
     const s = connectSocket();
     setSocket(s);
 
-    // 再接続を試行する関数
-    const attemptRejoin = () => {
-      if (!s.connected || isReconnectingRef.current) return;
-
-      const { roomId, playerName, sessionId } = getSessionInfo();
+    // 復帰可能かチェックする関数
+    const checkCanRejoin = () => {
+      const { roomId, playerName } = getSessionInfo();
       if (roomId && playerName) {
-        console.log('Attempting rejoin...', { roomId, sessionId, socketId: s.id });
-        isReconnectingRef.current = true;
-        setIsReconnecting(true);
-        s.emit('room:rejoin', { roomId, sessionId, playerName });
+        setCanRejoin(true);
+        setRejoinInfo({ roomId, playerName });
       }
     };
 
@@ -118,9 +119,9 @@ export function useSocket(): UseSocketReturn {
       setIsConnected(true);
       const currentSocketId = s.id;
 
-      // セッション情報があり、socket.idが変わっている場合は再接続を試行
+      // セッション情報があり、socket.idが変わっている場合は復帰可能状態に
       if (currentSocketId !== lastSocketIdRef.current) {
-        attemptRejoin();
+        checkCanRejoin();
       }
       lastSocketIdRef.current = currentSocketId ?? null;
     });
@@ -129,13 +130,10 @@ export function useSocket(): UseSocketReturn {
       setIsConnected(false);
     });
 
-    // タブがアクティブになった時に再接続を確認
+    // タブがアクティブになった時に復帰可能かチェック
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && s.connected) {
-        const { roomId, playerName } = getSessionInfo();
-        if (roomId && playerName) {
-          attemptRejoin();
-        }
+        checkCanRejoin();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -153,8 +151,9 @@ export function useSocket(): UseSocketReturn {
 
     // 再接続成功
     s.on('room:rejoined', ({ room, playerId, gameState }) => {
-      isReconnectingRef.current = false;
       setIsReconnecting(false);
+      setCanRejoin(false);
+      setRejoinInfo(null);
       setRoom(room);
       setPlayerId(playerId);
       if (gameState) {
@@ -173,10 +172,11 @@ export function useSocket(): UseSocketReturn {
 
     // 再接続失敗
     s.on('room:rejoinFailed', ({ message }) => {
-      isReconnectingRef.current = false;
       setIsReconnecting(false);
+      setCanRejoin(false);
+      setRejoinInfo(null);
       clearSessionInfo();
-      // エラーは表示しない（静かに失敗）
+      setError('復帰に失敗しました: ' + message);
       console.log('Rejoin failed:', message);
     });
 
@@ -296,6 +296,21 @@ export function useSocket(): UseSocketReturn {
     socket?.emit('room:join', { roomId, playerName, sessionId, myMark });
   }, [socket]);
 
+  const rejoinRoom = useCallback(() => {
+    const { roomId, playerName, sessionId } = getSessionInfo();
+    if (roomId && playerName && socket?.connected) {
+      console.log('Attempting rejoin...', { roomId, sessionId, socketId: socket.id });
+      setIsReconnecting(true);
+      socket.emit('room:rejoin', { roomId, sessionId, playerName });
+    }
+  }, [socket]);
+
+  const cancelRejoin = useCallback(() => {
+    setCanRejoin(false);
+    setRejoinInfo(null);
+    clearSessionInfo();
+  }, []);
+
   const leaveRoom = useCallback(() => {
     if (room) {
       socket?.emit('room:leave', { roomId: room.id });
@@ -374,6 +389,8 @@ export function useSocket(): UseSocketReturn {
     socket,
     isConnected,
     isReconnecting,
+    canRejoin,
+    rejoinInfo,
     room,
     playerId,
     gameState,
@@ -381,6 +398,8 @@ export function useSocket(): UseSocketReturn {
     disconnectedPlayers,
     createRoom,
     joinRoom,
+    rejoinRoom,
+    cancelRejoin,
     leaveRoom,
     startGame,
     playCards,

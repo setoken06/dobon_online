@@ -9,6 +9,8 @@ export default function Home() {
   const {
     isConnected,
     isReconnecting,
+    canRejoin,
+    rejoinInfo,
     room,
     playerId,
     gameState,
@@ -16,6 +18,8 @@ export default function Home() {
     disconnectedPlayers,
     createRoom,
     joinRoom,
+    rejoinRoom,
+    cancelRejoin,
     leaveRoom,
     startGame,
     playCards,
@@ -30,7 +34,7 @@ export default function Home() {
     clearError,
   } = useSocket();
 
-  // 再接続中オーバーレイ
+  // 復帰中オーバーレイ
   const reconnectingOverlay = isReconnecting && (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-8 text-center">
@@ -45,6 +49,48 @@ export default function Home() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-green-900">
         <div className="text-white text-xl">接続中...</div>
+      </div>
+    );
+  }
+
+  // 復帰可能な場合（部屋に入っていない状態でセッション情報がある）
+  if (canRejoin && rejoinInfo && !room) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-green-900 p-4">
+        {reconnectingOverlay}
+        <h1 className="text-4xl font-bold text-white mb-8">Dobon Online</h1>
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">ゲームに復帰</h2>
+          <p className="text-gray-600 mb-2">
+            前回のゲームが見つかりました
+          </p>
+          <p className="text-gray-800 mb-6">
+            ルームID: <span className="font-mono font-bold">{rejoinInfo.roomId}</span>
+            <br />
+            プレイヤー: <span className="font-bold">{rejoinInfo.playerName}</span>
+          </p>
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
+          <div className="space-y-3">
+            <button
+              onClick={rejoinRoom}
+              disabled={isReconnecting}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-xl font-semibold rounded-lg transition"
+            >
+              復帰する
+            </button>
+            <button
+              onClick={cancelRejoin}
+              disabled={isReconnecting}
+              className="w-full py-3 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-700 font-semibold rounded-lg transition"
+            >
+              新しく始める
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
