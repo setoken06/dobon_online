@@ -89,10 +89,10 @@ export function GameResult({
                       {winner.playerId === playerId && ' (あなた)'}
                     </p>
                     <p className="text-lg font-bold text-orange-600">
-                      {winner.finalScore.toLocaleString()}点
+                      {winner.finalScore.toLocaleString()} EVJ
                     </p>
                     <p className="text-xs text-gray-500">
-                      {rate} × {lastDrawValue} × {multiplier}倍（{winner.handCount}枚）
+                      {rate} EVJ × {lastDrawValue} × {multiplier}倍（{winner.handCount}枚）
                     </p>
                   </div>
                 );
@@ -104,9 +104,9 @@ export function GameResult({
           finalScore !== undefined && (
             <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-lg p-4 mb-6">
               <p className="text-sm text-gray-600 mb-2">勝利点</p>
-              <p className="text-3xl font-bold text-orange-600">{finalScore.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-orange-600">{finalScore.toLocaleString()} EVJ</p>
               <p className="text-xs text-gray-500 mt-2">
-                {rate} × {lastDrawValue} × {getHandCountMultiplier(winnerHandCount || 1)}倍（{winnerHandCount || 1}枚）
+                {rate} EVJ × {lastDrawValue} × {getHandCountMultiplier(winnerHandCount || 1)}倍（{winnerHandCount || 1}枚）
               </p>
             </div>
           )

@@ -162,7 +162,7 @@ export function GameBoard({
       {/* レート表示 */}
       <div className="absolute top-4 right-4 bg-black/50 text-white px-4 py-2 rounded-lg">
         <span className="text-sm">レート</span>
-        <span className="ml-2 text-xl font-bold text-yellow-400">{gameState.rate}</span>
+        <span className="ml-2 text-xl font-bold text-yellow-400">{gameState.rate} EVJ</span>
       </div>
 
       {/* 初期レートボーナス確認ポップアップ */}
@@ -188,7 +188,7 @@ export function GameBoard({
               ))}
             </div>
             <p className="text-white text-2xl font-bold mb-4">
-              現在のレート: {gameState.rate}
+              現在のレート: {gameState.rate} EVJ
             </p>
             {gameState.initialRateConfirmPlayerId === playerId ? (
               <button

@@ -225,21 +225,24 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
               {/* レート設定 */}
               <div>
                 <label htmlFor="rate" className="block text-sm font-medium text-gray-700 mb-1">
-                  レート
+                  レート (EVJ)
                 </label>
-                <input
-                  type="number"
-                  id="rate"
-                  min={1}
-                  value={rate}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value, 10);
-                    if (!isNaN(value) && value > 0) {
-                      setRate(value);
-                    }
-                  }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#333]"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    id="rate"
+                    min={1}
+                    value={rate}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value) && value > 0) {
+                        setRate(value);
+                      }
+                    }}
+                    className="w-full px-4 py-3 pr-14 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#333]"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">EVJ</span>
+                </div>
               </div>
             </>
           )}
