@@ -94,31 +94,51 @@ export function useSocket(): UseSocketReturn {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [disconnectedPlayers, setDisconnectedPlayers] = useState<Map<string, string>>(new Map());
-  const hasAttemptedRejoin = useRef(false);
+  const lastSocketIdRef = useRef<string | null>(null);
+  const isReconnectingRef = useRef(false);
 
   useEffect(() => {
     const s = connectSocket();
     setSocket(s);
 
+    // 再接続を試行する関数
+    const attemptRejoin = () => {
+      if (!s.connected || isReconnectingRef.current) return;
+
+      const { roomId, playerName, sessionId } = getSessionInfo();
+      if (roomId && playerName) {
+        console.log('Attempting rejoin...', { roomId, sessionId, socketId: s.id });
+        isReconnectingRef.current = true;
+        setIsReconnecting(true);
+        s.emit('room:rejoin', { roomId, sessionId, playerName });
+      }
+    };
+
     s.on('connect', () => {
       setIsConnected(true);
+      const currentSocketId = s.id;
 
-      // 再接続試行
-      if (!hasAttemptedRejoin.current) {
-        hasAttemptedRejoin.current = true;
-        const { roomId, playerName, sessionId } = getSessionInfo();
-        if (roomId && playerName) {
-          setIsReconnecting(true);
-          s.emit('room:rejoin', { roomId, sessionId, playerName });
-        }
+      // セッション情報があり、socket.idが変わっている場合は再接続を試行
+      if (currentSocketId !== lastSocketIdRef.current) {
+        attemptRejoin();
       }
+      lastSocketIdRef.current = currentSocketId ?? null;
     });
 
     s.on('disconnect', () => {
       setIsConnected(false);
-      // 再接続を許可するためにフラグをリセット
-      hasAttemptedRejoin.current = false;
     });
+
+    // タブがアクティブになった時に再接続を確認
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && s.connected) {
+        const { roomId, playerName } = getSessionInfo();
+        if (roomId && playerName) {
+          attemptRejoin();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // 部屋イベント
     s.on('room:created', ({ room, playerId }) => {
@@ -133,6 +153,7 @@ export function useSocket(): UseSocketReturn {
 
     // 再接続成功
     s.on('room:rejoined', ({ room, playerId, gameState }) => {
+      isReconnectingRef.current = false;
       setIsReconnecting(false);
       setRoom(room);
       setPlayerId(playerId);
@@ -147,10 +168,12 @@ export function useSocket(): UseSocketReturn {
         }
       });
       setDisconnectedPlayers(disconnected);
+      console.log('Rejoin successful');
     });
 
     // 再接続失敗
     s.on('room:rejoinFailed', ({ message }) => {
+      isReconnectingRef.current = false;
       setIsReconnecting(false);
       clearSessionInfo();
       // エラーは表示しない（静かに失敗）
@@ -256,6 +279,7 @@ export function useSocket(): UseSocketReturn {
     });
 
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       disconnectSocket();
     };
   }, []);
