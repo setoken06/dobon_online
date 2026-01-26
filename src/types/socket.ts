@@ -4,8 +4,9 @@ import { GameState } from './game';
 
 // クライアント → サーバー
 export interface ClientToServerEvents {
-  'room:create': (data: { roomId: string; playerName: string; jokerCount?: number; rate?: number; myMark: Suit }) => void;
-  'room:join': (data: { roomId: string; playerName: string; myMark: Suit }) => void;
+  'room:create': (data: { roomId: string; playerName: string; sessionId: string; jokerCount?: number; rate?: number; myMark: Suit }) => void;
+  'room:join': (data: { roomId: string; playerName: string; sessionId: string; myMark: Suit }) => void;
+  'room:rejoin': (data: { roomId: string; sessionId: string; playerName: string }) => void;
   'room:leave': (data: { roomId: string }) => void;
   'game:start': (data: { roomId: string }) => void;
   'game:playCard': (data: { roomId: string; cardIds: string[] }) => void;
@@ -23,9 +24,13 @@ export interface ClientToServerEvents {
 export interface ServerToClientEvents {
   'room:created': (data: { room: Room; playerId: string }) => void;
   'room:joined': (data: { room: Room; playerId: string }) => void;
+  'room:rejoined': (data: { room: Room; playerId: string; gameState?: GameState }) => void;
+  'room:rejoinFailed': (data: { message: string }) => void;
   'room:updated': (data: { room: Room }) => void;
   'room:playerJoined': (data: { player: Player }) => void;
   'room:playerLeft': (data: { playerId: string }) => void;
+  'room:playerDisconnected': (data: { playerId: string; playerName: string }) => void;
+  'room:playerReconnected': (data: { playerId: string; playerName: string }) => void;
   'room:deleted': () => void;
   'room:error': (data: { message: string }) => void;
   'game:started': (data: { gameState: GameState }) => void;

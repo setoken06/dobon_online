@@ -5,6 +5,7 @@ import { Deck } from './Deck';
 
 interface InternalPlayerState {
   playerId: string;
+  sessionId: string;
   playerName: string;
   hand: Card[];
   isReach: boolean;
@@ -48,6 +49,7 @@ export class GameManager {
     // プレイヤーの初期化
     this.players = players.map(p => ({
       playerId: p.id,
+      sessionId: p.sessionId,
       playerName: p.name,
       hand: [],
       isReach: false,
@@ -748,6 +750,38 @@ export class GameManager {
 
   isWaitingForInitialRateConfirm(): boolean {
     return this.waitingForInitialRateConfirm;
+  }
+
+  // 再接続時にプレイヤーIDを更新
+  updatePlayerId(sessionId: string, newPlayerId: string): void {
+    const player = this.players.find(p => p.sessionId === sessionId);
+    if (!player) return;
+
+    const oldPlayerId = player.playerId;
+    player.playerId = newPlayerId;
+
+    // ドボン関連のIDも更新
+    if (this.dobonablePlayerIds.has(oldPlayerId)) {
+      this.dobonablePlayerIds.delete(oldPlayerId);
+      this.dobonablePlayerIds.add(newPlayerId);
+    }
+    if (this.playersWhoSkippedDobon.has(oldPlayerId)) {
+      this.playersWhoSkippedDobon.delete(oldPlayerId);
+      this.playersWhoSkippedDobon.add(newPlayerId);
+    }
+    if (this.playersWhoDoboned.has(oldPlayerId)) {
+      const dobonInfo = this.playersWhoDoboned.get(oldPlayerId)!;
+      this.playersWhoDoboned.delete(oldPlayerId);
+      dobonInfo.playerId = newPlayerId;
+      this.playersWhoDoboned.set(newPlayerId, dobonInfo);
+    }
+    if (this.dobonGaeshiEligiblePlayerIds.has(oldPlayerId)) {
+      this.dobonGaeshiEligiblePlayerIds.delete(oldPlayerId);
+      this.dobonGaeshiEligiblePlayerIds.add(newPlayerId);
+    }
+    if (this.dobonTriggerPlayerId === oldPlayerId) {
+      this.dobonTriggerPlayerId = newPlayerId;
+    }
   }
 
   // 初期レートボーナス確認

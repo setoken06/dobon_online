@@ -6,9 +6,11 @@ export type MyMark = Suit;
 // プレイヤー
 export interface Player {
   id: string;          // Socket ID
+  sessionId: string;   // 再接続用のセッションID
   name: string;
   isHost: boolean;
   myMark?: MyMark;     // マイマーク
+  isDisconnected?: boolean;  // 切断中フラグ
 }
 
 // 部屋の状態

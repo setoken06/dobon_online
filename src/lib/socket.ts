@@ -9,6 +9,10 @@ export const getSocket = (): TypedSocket => {
   if (!socket) {
     socket = io({
       autoConnect: false,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
   }
   return socket;

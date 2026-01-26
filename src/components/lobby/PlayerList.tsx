@@ -5,11 +5,12 @@ import { Room } from '../../types/room';
 interface PlayerListProps {
   room: Room;
   playerId: string;
+  disconnectedPlayers: Map<string, string>;
   onStartGame: () => void;
   onLeaveRoom: () => void;
 }
 
-export function PlayerList({ room, playerId, onStartGame, onLeaveRoom }: PlayerListProps) {
+export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, onLeaveRoom }: PlayerListProps) {
   const isHost = room.hostId === playerId;
   const canStart = room.players.length >= room.minPlayers;
 
@@ -28,26 +29,39 @@ export function PlayerList({ room, playerId, onStartGame, onLeaveRoom }: PlayerL
             プレイヤー ({room.players.length}/{room.maxPlayers})
           </h3>
           <ul className="space-y-2">
-            {room.players.map((player) => (
-              <li
-                key={player.id}
-                className={`flex items-center justify-between px-4 py-3 rounded-lg ${
-                  player.id === playerId
-                    ? 'bg-blue-100 border-2 border-blue-500'
-                    : 'bg-gray-100'
-                }`}
-              >
-                <span className="font-medium text-[#333]">
-                  {player.name}
-                  {player.id === playerId && ' (あなた)'}
-                </span>
-                {player.isHost && (
-                  <span className="text-xs bg-yellow-400 text-yellow-900 px-2 py-1 rounded">
-                    ホスト
+            {room.players.map((player) => {
+              const isDisconnected = player.isDisconnected || disconnectedPlayers.has(player.id);
+              return (
+                <li
+                  key={player.id}
+                  className={`flex items-center justify-between px-4 py-3 rounded-lg ${
+                    player.id === playerId
+                      ? 'bg-blue-100 border-2 border-blue-500'
+                      : isDisconnected
+                      ? 'bg-gray-200 opacity-60'
+                      : 'bg-gray-100'
+                  }`}
+                >
+                  <span className={`font-medium ${isDisconnected ? 'text-gray-400' : 'text-[#333]'}`}>
+                    {player.name}
+                    {player.id === playerId && ' (あなた)'}
+                    {isDisconnected && ' (離席中)'}
                   </span>
-                )}
-              </li>
-            ))}
+                  <div className="flex gap-2">
+                    {isDisconnected && (
+                      <span className="text-xs bg-gray-500 text-white px-2 py-1 rounded">
+                        離席
+                      </span>
+                    )}
+                    {player.isHost && (
+                      <span className="text-xs bg-yellow-400 text-yellow-900 px-2 py-1 rounded">
+                        ホスト
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
 

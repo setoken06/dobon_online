@@ -102,6 +102,50 @@ export class RoomStore {
     this.rooms.delete(roomId);
     this.games.delete(roomId);
   }
+
+  // セッションIDでプレイヤーを検索
+  findPlayerBySessionId(roomId: string, sessionId: string): Player | undefined {
+    const room = this.rooms.get(roomId);
+    if (!room) return undefined;
+    return room.players.find(p => p.sessionId === sessionId);
+  }
+
+  // プレイヤーのsocket.idを更新（再接続時）
+  updatePlayerSocketId(roomId: string, sessionId: string, newSocketId: string): Player | undefined {
+    const room = this.rooms.get(roomId);
+    if (!room) return undefined;
+
+    const player = room.players.find(p => p.sessionId === sessionId);
+    if (player) {
+      const oldId = player.id;
+      player.id = newSocketId;
+      player.isDisconnected = false;
+
+      // ホストIDも更新
+      if (room.hostId === oldId) {
+        room.hostId = newSocketId;
+      }
+    }
+    return player;
+  }
+
+  // プレイヤーを切断状態にする
+  markPlayerDisconnected(roomId: string, playerId: string): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    const player = room.players.find(p => p.id === playerId);
+    if (player) {
+      player.isDisconnected = true;
+    }
+  }
+
+  // 全プレイヤーが切断中かチェック
+  areAllPlayersDisconnected(roomId: string): boolean {
+    const room = this.rooms.get(roomId);
+    if (!room) return true;
+    return room.players.every(p => p.isDisconnected === true);
+  }
 }
 
 export const roomStore = new RoomStore();

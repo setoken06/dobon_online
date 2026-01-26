@@ -41,10 +41,11 @@ app.prepare().then(() => {
     console.log('Client connected:', socket.id);
 
     // 部屋を作成
-    socket.on('room:create', ({ roomId, playerName, jokerCount, rate, myMark }) => {
+    socket.on('room:create', ({ roomId, playerName, sessionId, jokerCount, rate, myMark }) => {
       try {
         const host: Player = {
           id: socket.id,
+          sessionId,
           name: playerName,
           isHost: true,
           myMark,
@@ -72,10 +73,11 @@ app.prepare().then(() => {
     });
 
     // 部屋に参加
-    socket.on('room:join', ({ roomId, playerName, myMark }) => {
+    socket.on('room:join', ({ roomId, playerName, sessionId, myMark }) => {
       try {
         const player: Player = {
           id: socket.id,
+          sessionId,
           name: playerName,
           isHost: false,
           myMark,
@@ -101,6 +103,64 @@ app.prepare().then(() => {
     // 部屋を退出
     socket.on('room:leave', ({ roomId }) => {
       handleLeaveRoom(socket, roomId);
+    });
+
+    // 部屋に再参加
+    socket.on('room:rejoin', ({ roomId, sessionId, playerName }) => {
+      try {
+        const room = roomStore.getRoom(roomId);
+        if (!room) {
+          socket.emit('room:rejoinFailed', { message: '部屋が見つかりません' });
+          return;
+        }
+
+        const player = roomStore.findPlayerBySessionId(roomId, sessionId);
+        if (!player) {
+          socket.emit('room:rejoinFailed', { message: 'セッションが見つかりません' });
+          return;
+        }
+
+        // socket.idを更新
+        const updatedPlayer = roomStore.updatePlayerSocketId(roomId, sessionId, socket.id);
+        if (!updatedPlayer) {
+          socket.emit('room:rejoinFailed', { message: '復帰に失敗しました' });
+          return;
+        }
+
+        socket.join(roomId);
+        socket.data.roomId = roomId;
+        socket.data.playerId = socket.id;
+        socket.data.playerName = playerName;
+
+        // ゲーム中の場合はGameManagerのプレイヤーIDも更新
+        const game = roomStore.getGame(roomId);
+        if (game) {
+          game.updatePlayerId(sessionId, socket.id);
+        }
+
+        // 最新の部屋情報を取得
+        const updatedRoom = roomStore.getRoom(roomId);
+        const gameState = game?.getStateForPlayer(socket.id);
+
+        socket.emit('room:rejoined', {
+          room: updatedRoom!,
+          playerId: socket.id,
+          gameState,
+        });
+
+        // 他のプレイヤーに復帰を通知
+        socket.to(roomId).emit('room:playerReconnected', {
+          playerId: socket.id,
+          playerName,
+        });
+        io.to(roomId).emit('room:updated', { room: updatedRoom! });
+
+        console.log(`${playerName} rejoined room: ${roomId}`);
+      } catch (error) {
+        socket.emit('room:rejoinFailed', {
+          message: error instanceof Error ? error.message : '復帰に失敗しました',
+        });
+      }
     });
 
     // ゲーム開始
@@ -409,15 +469,47 @@ app.prepare().then(() => {
       }
     });
 
-    // 切断時
+    // 切断時（タブ切り替えなど）- 復帰可能な離席扱い
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
       if (socket.data.roomId) {
-        handleLeaveRoom(socket, socket.data.roomId);
+        handleDisconnect(socket, socket.data.roomId);
       }
     });
   });
 
+  // 切断処理（復帰可能）
+  function handleDisconnect(socket: any, roomId: string) {
+    const room = roomStore.getRoom(roomId);
+    if (!room) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player) return;
+
+    const playerName = player.name;
+
+    // プレイヤーを離席状態にする
+    roomStore.markPlayerDisconnected(roomId, socket.id);
+    socket.leave(roomId);
+
+    // 全員が離席した場合は部屋を削除
+    if (roomStore.areAllPlayersDisconnected(roomId)) {
+      console.log(`All players disconnected, deleting room: ${roomId}`);
+      roomStore.deleteRoom(roomId);
+      return;
+    }
+
+    // 他のプレイヤーに離席を通知
+    const updatedRoom = roomStore.getRoom(roomId);
+    if (updatedRoom) {
+      io.to(roomId).emit('room:playerDisconnected', { playerId: socket.id, playerName });
+      io.to(roomId).emit('room:updated', { room: updatedRoom });
+    }
+
+    console.log(`Player disconnected (can rejoin): ${playerName} in room ${roomId}`);
+  }
+
+  // 完全退出処理（room:leave時）
   function handleLeaveRoom(socket: any, roomId: string) {
     // 退出前に部屋のプレイヤーリストを取得
     const roomBefore = roomStore.getRoom(roomId);

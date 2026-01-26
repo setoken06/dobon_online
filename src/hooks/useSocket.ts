@@ -1,18 +1,74 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { getSocket, connectSocket, disconnectSocket, TypedSocket } from '../lib/socket';
 import { Room, Player } from '../types/room';
 import { GameState } from '../types/game';
 import { Suit } from '../types/card';
 
+// セッション管理用のlocalStorageキー
+const SESSION_KEYS = {
+  sessionId: 'dobon_sessionId',
+  roomId: 'dobon_currentRoomId',
+  playerName: 'dobon_currentPlayerName',
+};
+
+// UUIDを生成
+function generateSessionId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// セッション情報を取得または生成
+function getOrCreateSessionId(): string {
+  if (typeof window === 'undefined') return generateSessionId();
+
+  let sessionId = localStorage.getItem(SESSION_KEYS.sessionId);
+  if (!sessionId) {
+    sessionId = generateSessionId();
+    localStorage.setItem(SESSION_KEYS.sessionId, sessionId);
+  }
+  return sessionId;
+}
+
+// セッション情報を保存
+function saveSessionInfo(roomId: string, playerName: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(SESSION_KEYS.roomId, roomId);
+  localStorage.setItem(SESSION_KEYS.playerName, playerName);
+}
+
+// セッション情報をクリア
+function clearSessionInfo(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(SESSION_KEYS.roomId);
+  localStorage.removeItem(SESSION_KEYS.playerName);
+}
+
+// セッション情報を取得
+function getSessionInfo(): { roomId: string | null; playerName: string | null; sessionId: string } {
+  if (typeof window === 'undefined') {
+    return { roomId: null, playerName: null, sessionId: generateSessionId() };
+  }
+  return {
+    roomId: localStorage.getItem(SESSION_KEYS.roomId),
+    playerName: localStorage.getItem(SESSION_KEYS.playerName),
+    sessionId: getOrCreateSessionId(),
+  };
+}
+
 interface UseSocketReturn {
   socket: TypedSocket | null;
   isConnected: boolean;
+  isReconnecting: boolean;
   room: Room | null;
   playerId: string | null;
   gameState: GameState | null;
   error: string | null;
+  disconnectedPlayers: Map<string, string>;
   createRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit) => void;
   joinRoom: (roomId: string, playerName: string, myMark: Suit) => void;
   leaveRoom: () => void;
@@ -32,10 +88,13 @@ interface UseSocketReturn {
 export function useSocket(): UseSocketReturn {
   const [socket, setSocket] = useState<TypedSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [disconnectedPlayers, setDisconnectedPlayers] = useState<Map<string, string>>(new Map());
+  const hasAttemptedRejoin = useRef(false);
 
   useEffect(() => {
     const s = connectSocket();
@@ -43,10 +102,22 @@ export function useSocket(): UseSocketReturn {
 
     s.on('connect', () => {
       setIsConnected(true);
+
+      // 再接続試行
+      if (!hasAttemptedRejoin.current) {
+        hasAttemptedRejoin.current = true;
+        const { roomId, playerName, sessionId } = getSessionInfo();
+        if (roomId && playerName) {
+          setIsReconnecting(true);
+          s.emit('room:rejoin', { roomId, sessionId, playerName });
+        }
+      }
     });
 
     s.on('disconnect', () => {
       setIsConnected(false);
+      // 再接続を許可するためにフラグをリセット
+      hasAttemptedRejoin.current = false;
     });
 
     // 部屋イベント
@@ -60,8 +131,42 @@ export function useSocket(): UseSocketReturn {
       setPlayerId(playerId);
     });
 
+    // 再接続成功
+    s.on('room:rejoined', ({ room, playerId, gameState }) => {
+      setIsReconnecting(false);
+      setRoom(room);
+      setPlayerId(playerId);
+      if (gameState) {
+        setGameState(gameState);
+      }
+      // 離席中プレイヤーリストを更新
+      const disconnected = new Map<string, string>();
+      room.players.forEach(p => {
+        if (p.isDisconnected) {
+          disconnected.set(p.id, p.name);
+        }
+      });
+      setDisconnectedPlayers(disconnected);
+    });
+
+    // 再接続失敗
+    s.on('room:rejoinFailed', ({ message }) => {
+      setIsReconnecting(false);
+      clearSessionInfo();
+      // エラーは表示しない（静かに失敗）
+      console.log('Rejoin failed:', message);
+    });
+
     s.on('room:updated', ({ room }) => {
       setRoom(room);
+      // 離席中プレイヤーリストを更新
+      const disconnected = new Map<string, string>();
+      room.players.forEach(p => {
+        if (p.isDisconnected) {
+          disconnected.set(p.id, p.name);
+        }
+      });
+      setDisconnectedPlayers(disconnected);
     });
 
     s.on('room:playerJoined', ({ player }) => {
@@ -81,6 +186,30 @@ export function useSocket(): UseSocketReturn {
           ...prev,
           players: prev.players.filter(p => p.id !== playerId),
         };
+      });
+      // 離席リストからも削除
+      setDisconnectedPlayers(prev => {
+        const next = new Map(prev);
+        next.delete(playerId);
+        return next;
+      });
+    });
+
+    // プレイヤーが離席
+    s.on('room:playerDisconnected', ({ playerId, playerName }) => {
+      setDisconnectedPlayers(prev => {
+        const next = new Map(prev);
+        next.set(playerId, playerName);
+        return next;
+      });
+    });
+
+    // プレイヤーが復帰
+    s.on('room:playerReconnected', ({ playerId, playerName }) => {
+      setDisconnectedPlayers(prev => {
+        const next = new Map(prev);
+        next.delete(playerId);
+        return next;
       });
     });
 
@@ -121,6 +250,8 @@ export function useSocket(): UseSocketReturn {
     s.on('room:deleted', () => {
       setRoom(null);
       setGameState(null);
+      clearSessionInfo();
+      setDisconnectedPlayers(new Map());
       setError('部屋が削除されました');
     });
 
@@ -130,11 +261,15 @@ export function useSocket(): UseSocketReturn {
   }, []);
 
   const createRoom = useCallback((roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit) => {
-    socket?.emit('room:create', { roomId, playerName, jokerCount, rate, myMark });
+    const sessionId = getOrCreateSessionId();
+    saveSessionInfo(roomId, playerName);
+    socket?.emit('room:create', { roomId, playerName, sessionId, jokerCount, rate, myMark });
   }, [socket]);
 
   const joinRoom = useCallback((roomId: string, playerName: string, myMark: Suit) => {
-    socket?.emit('room:join', { roomId, playerName, myMark });
+    const sessionId = getOrCreateSessionId();
+    saveSessionInfo(roomId, playerName);
+    socket?.emit('room:join', { roomId, playerName, sessionId, myMark });
   }, [socket]);
 
   const leaveRoom = useCallback(() => {
@@ -142,6 +277,8 @@ export function useSocket(): UseSocketReturn {
       socket?.emit('room:leave', { roomId: room.id });
       setRoom(null);
       setGameState(null);
+      clearSessionInfo();
+      setDisconnectedPlayers(new Map());
     }
   }, [socket, room]);
 
@@ -212,10 +349,12 @@ export function useSocket(): UseSocketReturn {
   return {
     socket,
     isConnected,
+    isReconnecting,
     room,
     playerId,
     gameState,
     error,
+    disconnectedPlayers,
     createRoom,
     joinRoom,
     leaveRoom,

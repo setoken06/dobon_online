@@ -14,6 +14,7 @@ import { SUIT_SYMBOLS } from '../../types/card';
 interface GameBoardProps {
   gameState: GameState;
   playerId: string;
+  disconnectedPlayers: Map<string, string>;
   onPlayCards: (cardIds: string[]) => void;
   onDrawCard: () => void;
   onPass: () => void;
@@ -28,6 +29,7 @@ interface GameBoardProps {
 export function GameBoard({
   gameState,
   playerId,
+  disconnectedPlayers,
   onPlayCards,
   onDrawCard,
   onPass,
@@ -61,8 +63,10 @@ export function GameBoard({
     return myPlayer.hand.some((card) => canPlayCard(card, gameState.topCard, gameState.effectiveTopCard));
   }, [myPlayer?.hand, gameState.topCard, gameState.effectiveTopCard]);
 
-  // パス可能かどうか（7枚以上で出せるカードがある場合は不可、ドボン待機中は不可）
-  const canPass = isMyTurn && gameState.hasDrawnThisTurn && !gameState.mustPlayCard && !isWaitingForDobonAction;
+  // パス可能かどうか（7枚以上の場合は不可、ドボン待機中は不可）
+  // 7枚以上で出せるカードがある場合 → mustPlayCard=true → パス不可
+  // 7枚以上で出せるカードがない場合 → 強制ドロー中 → パス不可
+  const canPass = isMyTurn && gameState.hasDrawnThisTurn && !gameState.mustPlayCard && !isWaitingForDobonAction && !(handCount >= 7 && !hasPlayableCard);
 
   // ターンが変わったら選択をリセット
   useEffect(() => {
@@ -159,10 +163,24 @@ export function GameBoard({
         />
       )}
 
-      {/* レート表示 */}
-      <div className="absolute top-4 right-4 bg-black/50 text-white px-4 py-2 rounded-lg">
-        <span className="text-sm">レート</span>
-        <span className="ml-2 text-xl font-bold text-yellow-400">{gameState.rate} EVJ</span>
+      {/* レート表示 + スマホ用ターン表示 */}
+      <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+        <div className="bg-black/50 text-white px-4 py-2 rounded-lg">
+          <span className="text-sm">レート</span>
+          <span className="ml-2 text-xl font-bold text-yellow-400">{gameState.rate} EVJ</span>
+        </div>
+        {/* スマホ用ターン表示 */}
+        <div className="md:hidden">
+          {isMyTurn ? (
+            <div className="bg-yellow-400 text-yellow-900 px-4 py-1 rounded-full font-bold text-sm animate-pulse">
+              あなたのターン
+            </div>
+          ) : (
+            <div className="bg-gray-600 text-white px-4 py-1 rounded-full font-medium text-sm">
+              {gameState.players.find((p) => p.playerId === gameState.currentPlayerId)?.playerName} のターン
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 初期レートボーナス確認ポップアップ */}
@@ -210,7 +228,7 @@ export function GameBoard({
       {gameState.canDobon && !isFinished && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
           <div className="bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl p-8 shadow-2xl text-center animate-pulse">
-            <h2 className="text-4xl font-bold text-white mb-4">ドボンできます！</h2>
+            <h2 className="text-4xl font-bold text-white mb-4">ドボン！</h2>
             <p className="text-white/90 mb-6">場のカードで上がれます</p>
             <div className="flex gap-4 justify-center">
               <button
@@ -241,7 +259,7 @@ export function GameBoard({
                   {gameState.dobonPlayerNames.join(', ')} がドボンしました
                 </p>
                 <p className="text-white/90 mb-6">
-                  全員にドボン返しできます！（手札合計: あなた + {gameState.dobonPlayerNames.length}人分）
+                  ドボン返し！（手札合計: あなた + {gameState.dobonPlayerNames.length}人分）
                 </p>
               </>
             ) : (
@@ -268,8 +286,8 @@ export function GameBoard({
         </div>
       )}
 
-      {/* ターン表示 */}
-      <div className="text-center mb-4">
+      {/* ターン表示（PC用・中央配置） */}
+      <div className="hidden md:block text-center mb-4">
         {isMyTurn ? (
           <div className="inline-block bg-yellow-400 text-yellow-900 px-6 py-2 rounded-full font-bold text-lg animate-pulse">
             あなたのターン
@@ -288,6 +306,7 @@ export function GameBoard({
             key={opponent.playerId}
             player={opponent}
             isCurrentTurn={gameState.currentPlayerId === opponent.playerId}
+            isDisconnected={disconnectedPlayers.has(opponent.playerId)}
           />
         ))}
       </div>
