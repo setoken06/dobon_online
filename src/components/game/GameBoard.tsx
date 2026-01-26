@@ -163,23 +163,28 @@ export function GameBoard({
         />
       )}
 
-      {/* レート表示 + スマホ用ターン表示 */}
-      <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+      {/* スマホ用: レート + ターン表示（横並び） */}
+      <div className="md:hidden flex justify-between items-center mb-2">
+        <div className="bg-black/50 text-white px-3 py-1 rounded-lg">
+          <span className="text-xs">レート</span>
+          <span className="ml-1 text-sm font-bold text-yellow-400">{gameState.rate} EVJ</span>
+        </div>
+        {isMyTurn ? (
+          <div className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full font-bold text-sm animate-pulse">
+            あなたのターン
+          </div>
+        ) : (
+          <div className="bg-gray-600 text-white px-3 py-1 rounded-full font-medium text-sm">
+            {gameState.players.find((p) => p.playerId === gameState.currentPlayerId)?.playerName} のターン
+          </div>
+        )}
+      </div>
+
+      {/* PC用: レート表示（右上固定） */}
+      <div className="hidden md:block absolute top-4 right-4">
         <div className="bg-black/50 text-white px-4 py-2 rounded-lg">
           <span className="text-sm">レート</span>
           <span className="ml-2 text-xl font-bold text-yellow-400">{gameState.rate} EVJ</span>
-        </div>
-        {/* スマホ用ターン表示 */}
-        <div className="md:hidden">
-          {isMyTurn ? (
-            <div className="bg-yellow-400 text-yellow-900 px-4 py-1 rounded-full font-bold text-sm animate-pulse">
-              あなたのターン
-            </div>
-          ) : (
-            <div className="bg-gray-600 text-white px-4 py-1 rounded-full font-medium text-sm">
-              {gameState.players.find((p) => p.playerId === gameState.currentPlayerId)?.playerName} のターン
-            </div>
-          )}
         </div>
       </div>
 
