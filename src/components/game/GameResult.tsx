@@ -1,7 +1,7 @@
 'use client';
 
 import { Card as CardType, isJokerCard } from '../../types/card';
-import { WinnerInfo } from '../../types/game';
+import { WinnerInfo, LoserInfo } from '../../types/game';
 import { Card } from './Card';
 
 interface GameResultProps {
@@ -14,6 +14,7 @@ interface GameResultProps {
   rate: number;
   winners?: WinnerInfo[];
   playerId: string;
+  loser?: LoserInfo;
 }
 
 export function GameResult({
@@ -26,6 +27,7 @@ export function GameResult({
   rate,
   winners,
   playerId,
+  loser,
 }: GameResultProps) {
   // ラストドローの最終カード（ジョーカー以外）を取得
   const lastNonJokerCard = lastDrawCards?.find(c => !isJokerCard(c));
@@ -43,6 +45,17 @@ export function GameResult({
   // 自分が勝者の中にいるか
   const myWinner = winners?.find(w => w.playerId === playerId);
 
+  // オナニー成功判定：ツモドボンで、自分がカードを切った場合
+  const isOnaniiSuccess = loser?.isTsumoDobon && loser?.playerId === playerId && isWinner;
+
+  // ドボンされたプレイヤーの表示名を決定
+  const getLoserDisplayName = (): string | null => {
+    if (!loser) return null;
+    if (isOnaniiSuccess) return 'オナニー成功';
+    return loser.playerName;
+  };
+  const loserDisplayName = getLoserDisplayName();
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
@@ -59,6 +72,22 @@ export function GameResult({
               ? `${winners?.map(w => w.playerName).join(', ')} の勝利です`
               : `${winnerName} の勝利です`}
         </p>
+
+        {/* ドボンされたプレイヤー表示 */}
+        {loserDisplayName && (
+          <div className={`mb-4 p-3 rounded-lg ${isOnaniiSuccess ? 'bg-purple-100' : 'bg-red-100'}`}>
+            <p className="text-sm text-gray-500 mb-1">
+              {loser?.isTsumoDobon ? 'ツモドボン' : 'ドボン'}
+            </p>
+            <p className={`text-lg font-bold ${isOnaniiSuccess ? 'text-purple-600' : 'text-red-600'}`}>
+              {isOnaniiSuccess ? (
+                <>🎊 {loserDisplayName} 🎊</>
+              ) : (
+                <>{loserDisplayName} がドボンされました</>
+              )}
+            </p>
+          </div>
+        )}
 
         {/* ラストドロー表示 */}
         {lastDrawCards && lastDrawCards.length > 0 && (

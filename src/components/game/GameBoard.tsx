@@ -63,10 +63,10 @@ export function GameBoard({
     return myPlayer.hand.some((card) => canPlayCard(card, gameState.topCard, gameState.effectiveTopCard));
   }, [myPlayer?.hand, gameState.topCard, gameState.effectiveTopCard]);
 
-  // パス可能かどうか（7枚以上の場合は不可、ドボン待機中は不可）
-  // 7枚以上で出せるカードがある場合 → mustPlayCard=true → パス不可
-  // 7枚以上で出せるカードがない場合 → 強制ドロー中 → パス不可
-  const canPass = isMyTurn && gameState.hasDrawnThisTurn && !gameState.mustPlayCard && !isWaitingForDobonAction && !(handCount >= 7 && !hasPlayableCard);
+  // パス可能かどうか（8枚以上の場合は不可、ドボン待機中は不可）
+  // 8枚以上で出せるカードがある場合 → mustPlayCard=true → パス不可
+  // 8枚以上で出せるカードがない場合 → 強制ドロー中 → パス不可
+  const canPass = isMyTurn && gameState.hasDrawnThisTurn && !gameState.mustPlayCard && !isWaitingForDobonAction && !(handCount >= 8 && !hasPlayableCard);
 
   // ターンが変わったら選択をリセット
   useEffect(() => {
@@ -74,7 +74,7 @@ export function GameBoard({
   }, [gameState.currentPlayerId]);
 
   // 出せるカードがない場合、自動的に1枚引く
-  // 7枚以上で出せるカードがない場合も自動で引き続ける
+  // 8枚以上で出せるカードがない場合も自動で引き続ける
   // ドボン待機中は自動ドローしない
   useEffect(() => {
     if (isMyTurn && gameState.status === 'playing' && !isWaitingForDobonAction) {
@@ -160,6 +160,7 @@ export function GameBoard({
           rate={gameState.rate}
           winners={gameState.winners}
           playerId={playerId}
+          loser={gameState.loser}
         />
       )}
 
@@ -344,7 +345,7 @@ export function GameBoard({
                 カードを引く
               </button>
             )}
-            {/* カードを引いた後：パスボタン（7枚以上で出せるカードがある場合は非表示） */}
+            {/* カードを引いた後：パスボタン（8枚以上で出せるカードがある場合は非表示） */}
             {canPass && (
               <button
                 onClick={onPass}
@@ -357,7 +358,7 @@ export function GameBoard({
           {/* 状態メッセージ */}
           {gameState.mustPlayCard && (
             <span className="text-red-400 text-center font-bold">
-              手札が7枚以上です。カードを出してください（パス不可）
+              手札が8枚以上です。カードを出してください（パス不可）
             </span>
           )}
           {gameState.hasDrawnThisTurn && !gameState.mustPlayCard && (

@@ -1,5 +1,5 @@
 import { Card, canPlayCard, isJokerCard, Suit } from '../../src/types/card';
-import { GameState, PlayerGameState, GAME_CONFIG, WinnerInfo, InitialRateBonus } from '../../src/types/game';
+import { GameState, PlayerGameState, GAME_CONFIG, WinnerInfo, InitialRateBonus, LoserInfo } from '../../src/types/game';
 import { Player, MyMark } from '../../src/types/room';
 import { Deck } from './Deck';
 
@@ -36,6 +36,13 @@ export class GameManager {
   private dobonGaeshiEligiblePlayerIds: Set<string> = new Set();
   private dobonTriggerPlayerId?: string; // カードを出したプレイヤー（ドボン返し対象）
   private dobonCardValue?: number;
+  // 最後にカードを出したプレイヤー情報（ツモドボン用）
+  private lastDiscardPlayerId?: string;
+  private lastDiscardPlayerName?: string;
+  // ツモドボンフラグ
+  private isTsumoDobon: boolean = false;
+  // 敗者情報
+  private loser?: LoserInfo;
   // 初期レートボーナス関連
   private initialRateBonuses: InitialRateBonus[] = [];
   private waitingForInitialRateConfirm: boolean = false;
@@ -275,10 +282,10 @@ export class GameManager {
       winningNumbers = this.calculateWinningNumbers(player.hand);
     }
 
-    // 7枚以上で出せるカードがあるか
+    // 8枚以上で出せるカードがあるか
     const isCurrentPlayer = this.getCurrentPlayer().playerId === playerId;
     const hasPlayableCard = player ? this.getPlayableCards(playerId).length > 0 : false;
-    const mustPlayCard = isCurrentPlayer && (player?.hand.length ?? 0) >= 7 && hasPlayableCard;
+    const mustPlayCard = isCurrentPlayer && (player?.hand.length ?? 0) >= 8 && hasPlayableCard;
 
     const topCard = this.getTopCard();
     const effectiveTopCard = isJokerCard(topCard) ? this.getEffectiveTopCard() : undefined;
@@ -305,6 +312,8 @@ export class GameManager {
       mustPlayCard,
       // 複数勝者対応
       winners: this.winners.length > 0 ? this.winners : undefined,
+      // 敗者情報
+      loser: this.loser,
       // 後方互換性
       winnerId: firstWinner?.playerId,
       winnerName: firstWinner?.playerName,
@@ -399,6 +408,10 @@ export class GameManager {
       this.discardPile.push(card);
     }
 
+    // 最後にカードを出したプレイヤーを記録（ツモドボン用）
+    this.lastDiscardPlayerId = playerId;
+    this.lastDiscardPlayerName = currentPlayer.playerName;
+
     // カードを出した後、リーチ状態を更新（ドボン返し判定のため）
     if (this.checkReachCondition(currentPlayer.hand)) {
       currentPlayer.isReach = true;
@@ -410,6 +423,7 @@ export class GameManager {
     this.dobonablePlayerIds.clear();
     this.playersWhoDoboned.clear();
     this.playersWhoSkippedDobon.clear();
+    this.isTsumoDobon = false; // 通常ドボンなのでフラグをリセット
     const lastCard = cards[cards.length - 1];
     const cardValue = this.getCardValue(lastCard);
 
@@ -448,7 +462,7 @@ export class GameManager {
       return { success: false, error: 'あなたのターンではありません' };
     }
 
-    // 通常は1回だけ引ける。ただし7枚以上で出せるカードがない場合は複数回引ける
+    // 通常は1回だけ引ける。ただし8枚以上で出せるカードがない場合は複数回引ける
     if (this.hasDrawnThisTurn) {
       const playableCards = this.getPlayableCards(playerId);
       if (currentPlayer.hand.length < 7 || playableCards.length > 0) {
@@ -473,22 +487,24 @@ export class GameManager {
     currentPlayer.hand.push(card);
     this.hasDrawnThisTurn = true;
 
-    // リーチ状態で、場のカードで上がり数字になった場合はドボン可能
+    // リーチ状態で、場のカードで上がり数字になった場合はドボン可能（ツモドボン）
     this.dobonablePlayerIds.clear();
+    this.isTsumoDobon = false;
     if (currentPlayer.isReach) {
       const effectiveCard = this.getEffectiveTopCard();
       if (effectiveCard) {
         const topCardValue = this.getCardValue(effectiveCard);
         if (this.checkDobonCondition(playerId, topCardValue)) {
           this.dobonablePlayerIds.add(playerId);
+          this.isTsumoDobon = true; // ツモドボンフラグを立てる
         }
       }
     }
 
-    // 7枚以上で出せるカードがまだない場合
+    // 8枚以上で出せるカードがまだない場合
     const playableAfterDraw = this.getPlayableCards(playerId);
 
-    if (currentPlayer.hand.length >= 7 && playableAfterDraw.length === 0) {
+    if (currentPlayer.hand.length >= 8 && playableAfterDraw.length === 0) {
       // ジョーカーがあれば強制的に出す
       const joker = this.getJokerFromHand(currentPlayer.hand);
       if (joker) {
@@ -512,11 +528,11 @@ export class GameManager {
       return { success: false, error: '先にカードを引いてください' };
     }
 
-    // 7枚以上で出せるカードがある場合はパス不可
-    if (currentPlayer.hand.length >= 7) {
+    // 8枚以上で出せるカードがある場合はパス不可
+    if (currentPlayer.hand.length >= 8) {
       const playableCards = this.getPlayableCards(playerId);
       if (playableCards.length > 0) {
-        return { success: false, error: '手札が7枚以上の場合、出せるカードがあればパスできません' };
+        return { success: false, error: '手札が8枚以上の場合、出せるカードがあればパスできません' };
       }
     }
 
@@ -614,6 +630,26 @@ export class GameManager {
       });
     }
 
+    // 敗者情報を設定
+    if (this.isTsumoDobon && this.lastDiscardPlayerId && this.lastDiscardPlayerName) {
+      // ツモドボンの場合：最後にカードを出したプレイヤーが敗者
+      this.loser = {
+        playerId: this.lastDiscardPlayerId,
+        playerName: this.lastDiscardPlayerName,
+        isTsumoDobon: true,
+      };
+    } else if (this.dobonTriggerPlayerId) {
+      // 通常ドボンの場合：カードを出したプレイヤーが敗者
+      const triggerPlayer = this.findPlayer(this.dobonTriggerPlayerId);
+      if (triggerPlayer) {
+        this.loser = {
+          playerId: this.dobonTriggerPlayerId,
+          playerName: triggerPlayer.playerName,
+          isTsumoDobon: false,
+        };
+      }
+    }
+
     // クリア
     this.playersWhoDoboned.clear();
     this.playersWhoSkippedDobon.clear();
@@ -634,8 +670,10 @@ export class GameManager {
 
     // ドボン返し成功：手札枚数は自分の手札 + ドボンした全プレイヤーの手札
     let totalDobonHandCount = 0;
+    const dobonPlayerNames: string[] = [];
     for (const [, dobonInfo] of this.playersWhoDoboned) {
       totalDobonHandCount += dobonInfo.handCount;
+      dobonPlayerNames.push(dobonInfo.playerName);
     }
     const combinedHandCount = player.hand.length + totalDobonHandCount;
 
@@ -652,6 +690,16 @@ export class GameManager {
       handCount: combinedHandCount,
       finalScore: score,
     }];
+
+    // ドボン返しの場合、敗者はドボンを仕掛けたプレイヤーたち（最初の一人の名前を表示）
+    const firstDobonPlayer = Array.from(this.playersWhoDoboned.values())[0];
+    if (firstDobonPlayer) {
+      this.loser = {
+        playerId: firstDobonPlayer.playerId,
+        playerName: dobonPlayerNames.join(', '),
+        isTsumoDobon: false,
+      };
+    }
 
     // クリア
     this.dobonGaeshiEligiblePlayerIds.clear();

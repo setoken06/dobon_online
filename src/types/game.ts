@@ -17,6 +17,13 @@ export interface WinnerInfo {
   finalScore: number;
 }
 
+// 敗者情報（ドボンされたプレイヤー）
+export interface LoserInfo {
+  playerId: string;
+  playerName: string;
+  isTsumoDobon: boolean;  // ツモドボンかどうか
+}
+
 // 初期レートボーナス情報
 export interface InitialRateBonus {
   type: 'joker' | 'myMark';
@@ -37,10 +44,11 @@ export interface GameState {
   canDobon: boolean;          // ドボン可能か（自分視点）
   canDobonGaeshi: boolean;    // ドボン返し可能か（自分視点）
   winningNumbers?: number[];  // 自分の待ち数字（リーチ時のみ、非公開）
-  mustPlayCard: boolean;      // 手札7枚以上で出せるカードがある場合true
+  mustPlayCard: boolean;      // 手札8枚以上で出せるカードがある場合true
   winnerId?: string;          // 単独勝者（後方互換性のため維持）
   winnerName?: string;
   winners?: WinnerInfo[];     // 複数勝者対応
+  loser?: LoserInfo;          // ドボンされたプレイヤー情報
   // レート関連
   rate: number;               // 現在のレート
   lastDrawCards?: Card[];     // ラストドローで引いたカード
