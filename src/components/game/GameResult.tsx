@@ -48,8 +48,6 @@ export function GameResult({
 
   // 複数勝者がいる場合
   const hasMultipleWinners = winners && winners.length > 1;
-  // 自分が勝者の中にいるか
-  const myWinner = winners?.find(w => w.playerId === playerId);
 
   // オナニー成功判定：ツモドボンで、自分がカードを切った場合
   const isOnaniiSuccess = loser?.isTsumoDobon && loser?.playerId === playerId && isWinner;
@@ -63,13 +61,13 @@ export function GameResult({
   const loserDisplayName = getLoserDisplayName();
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
-        <div className="text-6xl mb-4">{isWinner ? '🎉' : '😢'}</div>
-        <h2 className="text-3xl font-bold text-gray-800 mb-2">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2">
+      <div className="bg-white rounded-2xl p-4 md:p-8 max-w-md w-full mx-2 text-center shadow-2xl max-h-[95vh] overflow-y-auto">
+        <div className="text-4xl md:text-6xl mb-2 md:mb-4">{isWinner ? '🎉' : '😢'}</div>
+        <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-1 md:mb-2">
           {isWinner ? '勝利！' : 'ゲーム終了'}
         </h2>
-        <p className="text-xl text-gray-600 mb-4">
+        <p className="text-lg md:text-xl text-gray-600 mb-3">
           {isWinner
             ? hasMultipleWinners
               ? '複数プレイヤーがドボン！'
@@ -81,11 +79,11 @@ export function GameResult({
 
         {/* ドボンされたプレイヤー表示 */}
         {loserDisplayName && (
-          <div className={`mb-4 p-3 rounded-lg ${isOnaniiSuccess ? 'bg-purple-100' : 'bg-red-100'}`}>
-            <p className="text-sm text-gray-500 mb-1">
+          <div className={`mb-3 p-2 rounded-lg ${isOnaniiSuccess ? 'bg-purple-100' : 'bg-red-100'}`}>
+            <p className="text-xs text-gray-500 mb-0.5">
               {loser?.isTsumoDobon ? 'ツモドボン' : 'ドボン'}
             </p>
-            <p className={`text-lg font-bold ${isOnaniiSuccess ? 'text-purple-600' : 'text-red-600'}`}>
+            <p className={`text-base font-bold ${isOnaniiSuccess ? 'text-purple-600' : 'text-red-600'}`}>
               {isOnaniiSuccess ? (
                 <>🎊 {loserDisplayName} 🎊</>
               ) : (
@@ -95,23 +93,21 @@ export function GameResult({
           </div>
         )}
 
-        {/* ドボンカード表示 */}
-        {dobonTriggerCard && (
-          <div className="mb-4">
-            <p className="text-sm text-gray-500 mb-2">ドボンしたカード</p>
-            <div className="flex justify-center">
-              <Card card={dobonTriggerCard} size="sm" disabled />
-            </div>
-          </div>
-        )}
-
-        {/* 勝者の手札表示 */}
-        {winnerPlayers && winnerPlayers.length > 0 && (
-          <div className="mb-4">
-            {winnerPlayers.map(wp => wp.hand && (
-              <div key={wp.playerId} className="mb-3">
-                <p className="text-sm text-gray-500 mb-2">{wp.playerName} の手札</p>
-                <div className="flex justify-center gap-2 flex-wrap">
+        {/* ドボンカード + 勝者手札（横並びコンパクト表示） */}
+        {(dobonTriggerCard || (winnerPlayers && winnerPlayers.length > 0)) && (
+          <div className="mb-3 flex flex-wrap items-start justify-center gap-3">
+            {/* ドボンカード */}
+            {dobonTriggerCard && (
+              <div className="text-center">
+                <p className="text-xs text-gray-500 mb-1">ドボンカード</p>
+                <Card card={dobonTriggerCard} size="sm" disabled />
+              </div>
+            )}
+            {/* 勝者の手札 */}
+            {winnerPlayers && winnerPlayers.map(wp => wp.hand && (
+              <div key={wp.playerId} className="text-center">
+                <p className="text-xs text-gray-500 mb-1">{wp.playerName} の手札</p>
+                <div className="flex gap-0.5 justify-center">
                   {wp.hand.map(card => (
                     <Card key={card.id} card={card} size="sm" disabled />
                   ))}
@@ -123,7 +119,7 @@ export function GameResult({
 
         {/* ラストドロー表示 */}
         {lastDrawCards && lastDrawCards.length > 0 && (
-          <div className="mb-4">
+          <div className="mb-3">
             <p className="text-sm text-gray-500 mb-2">ラストドロー</p>
             <div className="flex justify-center gap-2 flex-wrap">
               {lastDrawCards.map((card) => (
@@ -135,8 +131,8 @@ export function GameResult({
 
         {/* 複数勝者のスコア表示 */}
         {hasMultipleWinners ? (
-          <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-600 mb-3">勝者一覧</p>
+          <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-lg p-3 md:p-4 mb-4">
+            <p className="text-sm text-gray-600 mb-2">勝者一覧</p>
             <div className="space-y-2">
               {winners.map((winner) => {
                 const multiplier = getHandCountMultiplier(winner.handCount);
@@ -145,7 +141,7 @@ export function GameResult({
                     key={winner.playerId}
                     className={`p-2 rounded ${winner.playerId === playerId ? 'bg-yellow-200' : 'bg-white/50'}`}
                   >
-                    <p className={`font-bold ${winner.playerId === playerId ? 'text-orange-600' : 'text-gray-700'}`}>
+                    <p className={`font-bold text-sm ${winner.playerId === playerId ? 'text-orange-600' : 'text-gray-700'}`}>
                       {winner.playerName}
                       {winner.playerId === playerId && ' (あなた)'}
                     </p>
@@ -163,10 +159,10 @@ export function GameResult({
         ) : (
           /* 単独勝者のスコア表示 */
           finalScore !== undefined && (
-            <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-lg p-4 mb-6">
-              <p className="text-sm text-gray-600 mb-2">勝利点</p>
-              <p className="text-3xl font-bold text-orange-600">{finalScore.toLocaleString()} EVJ</p>
-              <p className="text-xs text-gray-500 mt-2">
+            <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-lg p-3 md:p-4 mb-4">
+              <p className="text-sm text-gray-600 mb-1">勝利点</p>
+              <p className="text-2xl md:text-3xl font-bold text-orange-600">{finalScore.toLocaleString()} EVJ</p>
+              <p className="text-xs text-gray-500 mt-1">
                 {rate} EVJ × {lastDrawValue} × {getHandCountMultiplier(winnerHandCount || 1)}倍（{winnerHandCount || 1}枚）
               </p>
             </div>

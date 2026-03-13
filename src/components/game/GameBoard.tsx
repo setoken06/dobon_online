@@ -297,12 +297,12 @@ export function GameBoard({
       {/* ドボン成功フェーズ */}
       {gameState.dobonPhase === 'success' && !isFinished && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
-          <div className={`rounded-2xl p-8 shadow-2xl text-center max-w-md ${
+          <div className={`rounded-2xl p-6 md:p-8 shadow-2xl text-center max-w-lg mx-4 ${
             gameState.isDobonGaeshi
               ? 'bg-gradient-to-br from-purple-500 to-blue-600'
               : 'bg-gradient-to-br from-red-500 to-pink-600'
           }`}>
-            <h2 className="text-4xl font-bold text-white mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
               {gameState.isDobonGaeshi ? 'ドボン返し成功！' : 'ドボン成功！'}
             </h2>
             {gameState.dobonPlayerNames && gameState.dobonPlayerNames.length > 0 && !gameState.isDobonGaeshi && (
@@ -316,10 +316,24 @@ export function GameBoard({
               </p>
             )}
             {gameState.loser && (
-              <p className="text-white/80 mb-6">
+              <p className="text-white/80 mb-4">
                 {gameState.loser.isTsumoDobon ? 'ツモドボン' : `${gameState.loser.playerName} をドボン`}
               </p>
             )}
+            {/* 勝者の手札を表示 */}
+            {gameState.dobonWinnerPlayerIds && gameState.dobonWinnerPlayerIds.map(winnerId => {
+              const winnerPlayer = gameState.players.find(p => p.playerId === winnerId);
+              return winnerPlayer?.hand && (
+                <div key={winnerId} className="mb-4">
+                  <p className="text-white/80 text-sm mb-2">{winnerPlayer.playerName} の手札</p>
+                  <div className="flex justify-center gap-1 flex-wrap">
+                    {winnerPlayer.hand.map(card => (
+                      <Card key={card.id} card={card} size="sm" disabled />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
             {gameState.dobonWinnerPlayerIds?.includes(playerId) ? (
               <button
                 onClick={onAdvanceDobonPhase}

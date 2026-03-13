@@ -271,8 +271,8 @@ export class GameManager {
   // 指定プレイヤー視点のゲーム状態を取得
   getStateForPlayer(playerId: string): GameState {
     const player = this.findPlayer(playerId);
-    // ドボン演出中（lastDraw/result）は勝者の手札を全員に公開
-    const showWinnerHands = this.dobonPhase === 'lastDraw' || this.dobonPhase === 'result';
+    // ドボン演出中（success/lastDraw/result）は勝者の手札を全員に公開
+    const showWinnerHands = !!this.dobonPhase;
     const winnerPlayerIdSet = showWinnerHands
       ? new Set(this.pendingDobonWinners.map(w => w.playerId))
       : null;
