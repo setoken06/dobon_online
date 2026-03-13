@@ -86,6 +86,7 @@ interface UseSocketReturn {
   skipDobonGaeshi: () => void;
   backToLobby: () => void;
   confirmInitialRate: () => void;
+  advanceDobonPhase: () => void;
   clearError: () => void;
 }
 
@@ -381,6 +382,12 @@ export function useSocket(): UseSocketReturn {
     }
   }, [socket, room]);
 
+  const advanceDobonPhase = useCallback(() => {
+    if (room) {
+      socket?.emit('game:advanceDobonPhase', { roomId: room.id });
+    }
+  }, [socket, room]);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -411,6 +418,7 @@ export function useSocket(): UseSocketReturn {
     skipDobonGaeshi,
     backToLobby,
     confirmInitialRate,
+    advanceDobonPhase,
     clearError,
   };
 }

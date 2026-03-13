@@ -24,6 +24,7 @@ interface GameBoardProps {
   onSkipDobonGaeshi: () => void;
   onBackToLobby: () => void;
   onConfirmInitialRate: () => void;
+  onAdvanceDobonPhase: () => void;
 }
 
 export function GameBoard({
@@ -39,6 +40,7 @@ export function GameBoard({
   onSkipDobonGaeshi,
   onBackToLobby,
   onConfirmInitialRate,
+  onAdvanceDobonPhase,
 }: GameBoardProps) {
   const myPlayer = gameState.players.find((p) => p.playerId === playerId);
   const opponents = gameState.players.filter((p) => p.playerId !== playerId);
@@ -50,8 +52,8 @@ export function GameBoard({
     : gameState.winnerId === playerId;
   const handCount = myPlayer?.hand?.length ?? 0;
 
-  // ドボン/ドボン返し待機中はアクション不可
-  const isWaitingForDobonAction = gameState.isWaitingForDobon || gameState.isWaitingForDobonGaeshi;
+  // ドボン/ドボン返し待機中 or ドボン演出中はアクション不可
+  const isWaitingForDobonAction = gameState.isWaitingForDobon || gameState.isWaitingForDobonGaeshi || !!gameState.dobonPhase;
   const canDraw = isMyTurn && !gameState.hasDrawnThisTurn && !isWaitingForDobonAction;
 
   // 選択中のカードID
@@ -290,6 +292,101 @@ export function GameBoard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ドボン成功フェーズ */}
+      {gameState.dobonPhase === 'success' && !isFinished && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
+          <div className={`rounded-2xl p-8 shadow-2xl text-center max-w-md ${
+            gameState.isDobonGaeshi
+              ? 'bg-gradient-to-br from-purple-500 to-blue-600'
+              : 'bg-gradient-to-br from-red-500 to-pink-600'
+          }`}>
+            <h2 className="text-4xl font-bold text-white mb-4">
+              {gameState.isDobonGaeshi ? 'ドボン返し成功！' : 'ドボン成功！'}
+            </h2>
+            {gameState.dobonPlayerNames && gameState.dobonPlayerNames.length > 0 && !gameState.isDobonGaeshi && (
+              <p className="text-white/90 text-xl mb-2">
+                {gameState.dobonPlayerNames.join(', ')}
+              </p>
+            )}
+            {gameState.isDobonGaeshi && gameState.dobonWinnerPlayerIds && (
+              <p className="text-white/90 text-xl mb-2">
+                {gameState.players.find(p => p.playerId === gameState.dobonWinnerPlayerIds![0])?.playerName}
+              </p>
+            )}
+            {gameState.loser && (
+              <p className="text-white/80 mb-6">
+                {gameState.loser.isTsumoDobon ? 'ツモドボン' : `${gameState.loser.playerName} をドボン`}
+              </p>
+            )}
+            {gameState.dobonWinnerPlayerIds?.includes(playerId) ? (
+              <button
+                onClick={onAdvanceDobonPhase}
+                className="px-8 py-4 bg-white text-gray-800 font-bold text-xl rounded-lg hover:bg-gray-100 transition transform hover:scale-105"
+              >
+                次へ
+              </button>
+            ) : (
+              <p className="text-white/70 animate-pulse">待機中...</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ラストドローフェーズ */}
+      {gameState.dobonPhase === 'lastDraw' && !isFinished && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
+          <div className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl p-8 shadow-2xl text-center max-w-lg">
+            <h2 className="text-4xl font-bold text-white mb-4">ラストドロー</h2>
+            {/* 勝者の手札を表示 */}
+            {gameState.dobonWinnerPlayerIds && gameState.dobonWinnerPlayerIds.map(winnerId => {
+              const winnerPlayer = gameState.players.find(p => p.playerId === winnerId);
+              return winnerPlayer?.hand && (
+                <div key={winnerId} className="mb-4">
+                  <p className="text-white/80 text-sm mb-2">{winnerPlayer.playerName} の手札</p>
+                  <div className="flex justify-center gap-2 flex-wrap">
+                    {winnerPlayer.hand.map(card => (
+                      <Card key={card.id} card={card} size="sm" disabled />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            <p className="text-white/90 mb-6">山札からカードを引いてスコアを決定します</p>
+            {gameState.dobonWinnerPlayerIds?.includes(playerId) ? (
+              <button
+                onClick={onAdvanceDobonPhase}
+                className="px-8 py-4 bg-white text-orange-600 font-bold text-xl rounded-lg hover:bg-gray-100 transition transform hover:scale-105"
+              >
+                ドロー！
+              </button>
+            ) : (
+              <p className="text-white/70 animate-pulse">待機中...</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ドボンリザルトフェーズ */}
+      {gameState.dobonPhase === 'result' && gameState.winners && (
+        <GameResult
+          winnerName={gameState.winners[0]?.playerName || ''}
+          isWinner={gameState.winners.some(w => w.playerId === playerId)}
+          onBackToLobby={onAdvanceDobonPhase}
+          lastDrawCards={gameState.lastDrawCards}
+          finalScore={gameState.finalScore}
+          winnerHandCount={gameState.winnerHandCount}
+          rate={gameState.rate}
+          winners={gameState.winners}
+          playerId={playerId}
+          loser={gameState.loser}
+          dobonWinnerPlayerIds={gameState.dobonWinnerPlayerIds}
+          dobonTriggerCard={gameState.dobonTriggerCard}
+          winnerPlayers={gameState.dobonWinnerPlayerIds
+            ?.map(id => gameState.players.find(p => p.playerId === id))
+            .filter((p): p is typeof gameState.players[0] => !!p)}
+        />
       )}
 
       {/* ターン表示（PC用・中央配置） */}

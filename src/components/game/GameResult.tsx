@@ -1,7 +1,7 @@
 'use client';
 
 import { Card as CardType, isJokerCard } from '../../types/card';
-import { WinnerInfo, LoserInfo } from '../../types/game';
+import { WinnerInfo, LoserInfo, PlayerGameState } from '../../types/game';
 import { Card } from './Card';
 
 interface GameResultProps {
@@ -15,6 +15,9 @@ interface GameResultProps {
   winners?: WinnerInfo[];
   playerId: string;
   loser?: LoserInfo;
+  dobonWinnerPlayerIds?: string[];
+  dobonTriggerCard?: CardType;
+  winnerPlayers?: PlayerGameState[];
 }
 
 export function GameResult({
@@ -28,6 +31,9 @@ export function GameResult({
   winners,
   playerId,
   loser,
+  dobonWinnerPlayerIds,
+  dobonTriggerCard,
+  winnerPlayers,
 }: GameResultProps) {
   // ラストドローの最終カード（ジョーカー以外）を取得
   const lastNonJokerCard = lastDrawCards?.find(c => !isJokerCard(c));
@@ -89,6 +95,32 @@ export function GameResult({
           </div>
         )}
 
+        {/* ドボンカード表示 */}
+        {dobonTriggerCard && (
+          <div className="mb-4">
+            <p className="text-sm text-gray-500 mb-2">ドボンしたカード</p>
+            <div className="flex justify-center">
+              <Card card={dobonTriggerCard} size="sm" disabled />
+            </div>
+          </div>
+        )}
+
+        {/* 勝者の手札表示 */}
+        {winnerPlayers && winnerPlayers.length > 0 && (
+          <div className="mb-4">
+            {winnerPlayers.map(wp => wp.hand && (
+              <div key={wp.playerId} className="mb-3">
+                <p className="text-sm text-gray-500 mb-2">{wp.playerName} の手札</p>
+                <div className="flex justify-center gap-2 flex-wrap">
+                  {wp.hand.map(card => (
+                    <Card key={card.id} card={card} size="sm" disabled />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* ラストドロー表示 */}
         {lastDrawCards && lastDrawCards.length > 0 && (
           <div className="mb-4">
@@ -141,12 +173,25 @@ export function GameResult({
           )
         )}
 
-        <button
-          onClick={onBackToLobby}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
-        >
-          待機画面に戻る
-        </button>
+        {dobonWinnerPlayerIds ? (
+          dobonWinnerPlayerIds.includes(playerId) ? (
+            <button
+              onClick={onBackToLobby}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
+            >
+              待機画面に戻る
+            </button>
+          ) : (
+            <p className="text-gray-400 animate-pulse">待機中...</p>
+          )
+        ) : (
+          <button
+            onClick={onBackToLobby}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
+          >
+            待機画面に戻る
+          </button>
+        )}
       </div>
     </div>
   );

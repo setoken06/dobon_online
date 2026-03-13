@@ -18,6 +18,7 @@ export interface ClientToServerEvents {
   'game:skipDobonGaeshi': (data: { roomId: string }) => void;
   'game:backToLobby': (data: { roomId: string }) => void;
   'game:confirmInitialRate': (data: { roomId: string }) => void;
+  'game:advanceDobonPhase': (data: { roomId: string }) => void;
 }
 
 // サーバー → クライアント

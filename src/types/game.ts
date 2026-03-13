@@ -67,6 +67,11 @@ export interface GameState {
   // ドボン待機関連
   isWaitingForDobon?: boolean;              // 誰かがドボン選択中
   isWaitingForDobonGaeshi?: boolean;        // 誰かがドボン返し選択中
+  // ドボン演出フェーズ
+  dobonPhase?: 'success' | 'lastDraw' | 'result';
+  dobonWinnerPlayerIds?: string[];          // フェーズ進行ボタンを押せるプレイヤー
+  isDobonGaeshi?: boolean;                  // ドボン返しによる勝利か
+  dobonTriggerCard?: Card;                  // ドボンの原因となったカード
 }
 
 // ゲーム設定

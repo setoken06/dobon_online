@@ -46,6 +46,12 @@ export class GameManager {
   // 初期レートボーナス関連
   private initialRateBonuses: InitialRateBonus[] = [];
   private waitingForInitialRateConfirm: boolean = false;
+  // ドボン演出フェーズ
+  private dobonPhase?: 'success' | 'lastDraw' | 'result';
+  private pendingDobonWinners: DobonPlayerInfo[] = [];
+  private pendingDobonIsGaeshi: boolean = false;
+  private pendingGaeshiTotalMultiplier?: number;
+  private dobonTriggerCard?: Card; // ドボンの原因となったカード
 
   constructor(roomId: string, players: Player[], jokerCount: number = 0, initialRate: number = 100) {
     this.roomId = roomId;
@@ -265,11 +271,16 @@ export class GameManager {
   // 指定プレイヤー視点のゲーム状態を取得
   getStateForPlayer(playerId: string): GameState {
     const player = this.findPlayer(playerId);
+    // ドボン演出中（lastDraw/result）は勝者の手札を全員に公開
+    const showWinnerHands = this.dobonPhase === 'lastDraw' || this.dobonPhase === 'result';
+    const winnerPlayerIdSet = showWinnerHands
+      ? new Set(this.pendingDobonWinners.map(w => w.playerId))
+      : null;
     const playerStates: PlayerGameState[] = this.players.map(p => ({
       playerId: p.playerId,
       playerName: p.playerName,
       cardCount: p.hand.length,
-      hand: p.playerId === playerId ? p.hand : undefined,
+      hand: p.playerId === playerId || winnerPlayerIdSet?.has(p.playerId) ? p.hand : undefined,
       isReach: p.isReach,
     }));
 
@@ -297,9 +308,14 @@ export class GameManager {
     // 後方互換性のための単独勝者情報
     const firstWinner = this.winners.length > 0 ? this.winners[0] : undefined;
 
+    // ドボン演出フェーズの勝者プレイヤーID一覧
+    const dobonWinnerPlayerIds = this.dobonPhase
+      ? this.pendingDobonWinners.map(w => w.playerId)
+      : undefined;
+
     return {
       roomId: this.roomId,
-      status: this.winners.length > 0 ? 'finished' : 'playing',
+      status: this.winners.length > 0 && !this.dobonPhase ? 'finished' : 'playing',
       players: playerStates,
       currentPlayerId: this.getCurrentPlayer().playerId,
       topCard,
@@ -331,9 +347,14 @@ export class GameManager {
       initialRateBonuses: this.initialRateBonuses.length > 0 ? this.initialRateBonuses : undefined,
       waitingForInitialRateConfirm: this.waitingForInitialRateConfirm,
       initialRateConfirmPlayerId: this.waitingForInitialRateConfirm ? this.getCurrentPlayer().playerId : undefined,
-      // ドボン待機関連
-      isWaitingForDobon: this.dobonablePlayerIds.size > 0,
-      isWaitingForDobonGaeshi: this.dobonGaeshiEligiblePlayerIds.size > 0,
+      // ドボン待機関連（自分がドボン/ドボン返しの権利を持っていない場合は隠す）
+      isWaitingForDobon: this.dobonablePlayerIds.has(playerId),
+      isWaitingForDobonGaeshi: this.dobonGaeshiEligiblePlayerIds.has(playerId),
+      // ドボン演出フェーズ
+      dobonPhase: this.dobonPhase,
+      dobonWinnerPlayerIds,
+      isDobonGaeshi: this.dobonPhase ? this.pendingDobonIsGaeshi : undefined,
+      dobonTriggerCard: this.dobonPhase ? this.dobonTriggerCard : undefined,
     };
   }
 
@@ -354,6 +375,16 @@ export class GameManager {
 
   // カードを出す（複数枚対応：同じ数字なら2枚まで同時に出せる）
   playCards(playerId: string, cardIds: string[]): { success: boolean; error?: string } {
+    // ドボン演出フェーズ中はカードを出せない
+    if (this.dobonPhase) {
+      return { success: false, error: 'ドボン演出中です' };
+    }
+
+    // ドボン/ドボン返し待機中はカードを出せない
+    if (this.dobonablePlayerIds.size > 0 || this.dobonGaeshiEligiblePlayerIds.size > 0) {
+      return { success: false, error: 'ドボンの判定中です' };
+    }
+
     // 初期レート確認待ちの場合はカードを出せない
     if (this.waitingForInitialRateConfirm) {
       return { success: false, error: '初期レートの確認を待っています' };
@@ -452,6 +483,16 @@ export class GameManager {
 
   // カードを引く
   drawCard(playerId: string): { success: boolean; card?: Card; error?: string; mustDrawAgain?: boolean; mustPlayJoker?: boolean } {
+    // ドボン演出フェーズ中はカードを引けない
+    if (this.dobonPhase) {
+      return { success: false, error: 'ドボン演出中です' };
+    }
+
+    // ドボン/ドボン返し待機中はカードを引けない
+    if (this.dobonablePlayerIds.size > 0 || this.dobonGaeshiEligiblePlayerIds.size > 0) {
+      return { success: false, error: 'ドボンの判定中です' };
+    }
+
     // 初期レート確認待ちの場合はカードを引けない
     if (this.waitingForInitialRateConfirm) {
       return { success: false, error: '初期レートの確認を待っています' };
@@ -519,6 +560,16 @@ export class GameManager {
 
   // パス
   pass(playerId: string): { success: boolean; error?: string } {
+    // ドボン演出フェーズ中はパスできない
+    if (this.dobonPhase) {
+      return { success: false, error: 'ドボン演出中です' };
+    }
+
+    // ドボン/ドボン返し待機中はパスできない
+    if (this.dobonablePlayerIds.size > 0 || this.dobonGaeshiEligiblePlayerIds.size > 0) {
+      return { success: false, error: 'ドボンの判定中です' };
+    }
+
     const currentPlayer = this.getCurrentPlayer();
     if (currentPlayer.playerId !== playerId) {
       return { success: false, error: 'あなたのターンではありません' };
@@ -606,40 +657,49 @@ export class GameManager {
       }
     }
 
-    // ドボン返しできない場合、ドボンしたプレイヤー全員が勝利
-    this.finalizeMultipleWinners();
+    // ドボン返しできない場合、ドボン演出フェーズへ
+    this.enterDobonPhase(false);
     return { success: true, allResponded: true };
   }
 
-  // 複数勝者の確定処理
-  private finalizeMultipleWinners(): void {
-    this.performLastDraw();
+  // ドボン演出フェーズに入る
+  private enterDobonPhase(isGaeshi: boolean): void {
+    this.dobonPhase = 'success';
+    this.pendingDobonIsGaeshi = isGaeshi;
+    // ドボンの原因となったカード（場の一番上）を記録
+    this.dobonTriggerCard = this.getTopCard();
 
-    const lastNonJokerCard = this.lastDrawCards.find(c => !isJokerCard(c));
-    const lastDrawValue = lastNonJokerCard ? this.getCardValue(lastNonJokerCard) : 0;
-
-    this.winners = [];
-    for (const [, dobonInfo] of this.playersWhoDoboned) {
-      const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
-      const score = this.rate * lastDrawValue * handCountMultiplier;
-      this.winners.push({
-        playerId: dobonInfo.playerId,
-        playerName: dobonInfo.playerName,
-        handCount: dobonInfo.handCount,
-        finalScore: score,
-      });
+    if (isGaeshi) {
+      // ドボン返しの場合：gaeshi player が勝者（pendingDobonWinnersは呼び出し元で設定済み）
+    } else {
+      // 通常ドボンの場合：ドボンしたプレイヤー全員が勝者
+      this.pendingDobonWinners = Array.from(this.playersWhoDoboned.values());
     }
 
     // 敗者情報を設定
-    if (this.isTsumoDobon && this.lastDiscardPlayerId && this.lastDiscardPlayerName) {
-      // ツモドボンの場合：最後にカードを出したプレイヤーが敗者
+    this.setLoserInfo();
+  }
+
+  // 敗者情報を設定
+  private setLoserInfo(): void {
+    if (this.pendingDobonIsGaeshi) {
+      // ドボン返しの場合、敗者はドボンを仕掛けたプレイヤーたち
+      const dobonPlayerNames = Array.from(this.playersWhoDoboned.values()).map(p => p.playerName);
+      const firstDobonPlayer = Array.from(this.playersWhoDoboned.values())[0];
+      if (firstDobonPlayer) {
+        this.loser = {
+          playerId: firstDobonPlayer.playerId,
+          playerName: dobonPlayerNames.join(', '),
+          isTsumoDobon: false,
+        };
+      }
+    } else if (this.isTsumoDobon && this.lastDiscardPlayerId && this.lastDiscardPlayerName) {
       this.loser = {
         playerId: this.lastDiscardPlayerId,
         playerName: this.lastDiscardPlayerName,
         isTsumoDobon: true,
       };
     } else if (this.dobonTriggerPlayerId) {
-      // 通常ドボンの場合：カードを出したプレイヤーが敗者
       const triggerPlayer = this.findPlayer(this.dobonTriggerPlayerId);
       if (triggerPlayer) {
         this.loser = {
@@ -649,12 +709,79 @@ export class GameManager {
         };
       }
     }
+  }
 
-    // クリア
-    this.playersWhoDoboned.clear();
-    this.playersWhoSkippedDobon.clear();
-    this.dobonTriggerPlayerId = undefined;
-    this.dobonCardValue = undefined;
+  // ドボン演出フェーズを進める（勝者のみ操作可能）
+  advanceDobonPhase(playerId: string): { success: boolean; error?: string } {
+    if (!this.dobonPhase) {
+      return { success: false, error: 'ドボン演出中ではありません' };
+    }
+
+    // 勝者のみ操作可能
+    const isWinner = this.pendingDobonWinners.some(w => w.playerId === playerId);
+    if (!isWinner) {
+      return { success: false, error: 'ドボン成功者のみ操作できます' };
+    }
+
+    if (this.dobonPhase === 'success') {
+      this.dobonPhase = 'lastDraw';
+      return { success: true };
+    }
+
+    if (this.dobonPhase === 'lastDraw') {
+      // ラストドロー実行 & スコア計算
+      this.performLastDraw();
+      this.calculateFinalScores();
+      this.dobonPhase = 'result';
+      return { success: true };
+    }
+
+    if (this.dobonPhase === 'result') {
+      // 演出終了 → ゲーム終了状態へ
+      this.dobonPhase = undefined;
+      this.pendingDobonWinners = [];
+      this.pendingDobonIsGaeshi = false;
+      this.pendingGaeshiTotalMultiplier = undefined;
+      this.dobonTriggerCard = undefined;
+      this.playersWhoDoboned.clear();
+      this.playersWhoSkippedDobon.clear();
+      this.dobonTriggerPlayerId = undefined;
+      this.dobonCardValue = undefined;
+      return { success: true };
+    }
+
+    return { success: false, error: '不明なフェーズです' };
+  }
+
+  // スコア計算（ラストドロー後に呼ぶ）
+  private calculateFinalScores(): void {
+    const lastNonJokerCard = this.lastDrawCards.find(c => !isJokerCard(c));
+    const lastDrawValue = lastNonJokerCard ? this.getCardValue(lastNonJokerCard) : 0;
+
+    if (this.pendingDobonIsGaeshi && this.pendingGaeshiTotalMultiplier !== undefined) {
+      // ドボン返しの場合
+      const gaeshiWinner = this.pendingDobonWinners[0];
+      const score = this.rate * lastDrawValue * this.pendingGaeshiTotalMultiplier;
+      this.winners = [{
+        playerId: gaeshiWinner.playerId,
+        playerName: gaeshiWinner.playerName,
+        handCount: this.pendingGaeshiTotalMultiplier,
+        finalScore: score,
+      }];
+    } else {
+      // 通常ドボンの場合
+      this.winners = [];
+      for (const dobonInfo of this.pendingDobonWinners) {
+        const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
+        const score = this.rate * lastDrawValue * handCountMultiplier;
+        this.winners.push({
+          playerId: dobonInfo.playerId,
+          playerName: dobonInfo.playerName,
+          handCount: dobonInfo.handCount,
+          finalScore: score,
+        });
+      }
+    }
   }
 
   // ドボン返し
@@ -668,45 +795,22 @@ export class GameManager {
       return { success: false, error: 'プレイヤーが見つかりません' };
     }
 
-    // ドボン返し成功：手札枚数は自分の手札 + ドボンした全プレイヤーの手札
-    let totalDobonHandCount = 0;
-    const dobonPlayerNames: string[] = [];
+    // ドボン返し成功：倍率は自分の倍率 + ドボンした全プレイヤーの倍率
+    let totalMultiplier = this.getHandCountMultiplier(player.hand.length);
     for (const [, dobonInfo] of this.playersWhoDoboned) {
-      totalDobonHandCount += dobonInfo.handCount;
-      dobonPlayerNames.push(dobonInfo.playerName);
+      totalMultiplier += this.getHandCountMultiplier(dobonInfo.handCount);
     }
-    const combinedHandCount = player.hand.length + totalDobonHandCount;
 
-    this.performLastDraw();
+    this.dobonGaeshiEligiblePlayerIds.clear();
 
-    const lastNonJokerCard = this.lastDrawCards.find(c => !isJokerCard(c));
-    const lastDrawValue = lastNonJokerCard ? this.getCardValue(lastNonJokerCard) : 0;
-    const handCountMultiplier = this.getHandCountMultiplier(combinedHandCount);
-    const score = this.rate * lastDrawValue * handCountMultiplier;
-
-    this.winners = [{
+    // ドボン返し勝者を設定してフェーズに入る
+    this.pendingDobonWinners = [{
       playerId: player.playerId,
       playerName: player.playerName,
-      handCount: combinedHandCount,
-      finalScore: score,
+      handCount: player.hand.length,
     }];
-
-    // ドボン返しの場合、敗者はドボンを仕掛けたプレイヤーたち（最初の一人の名前を表示）
-    const firstDobonPlayer = Array.from(this.playersWhoDoboned.values())[0];
-    if (firstDobonPlayer) {
-      this.loser = {
-        playerId: firstDobonPlayer.playerId,
-        playerName: dobonPlayerNames.join(', '),
-        isTsumoDobon: false,
-      };
-    }
-
-    // クリア
-    this.dobonGaeshiEligiblePlayerIds.clear();
-    this.playersWhoDoboned.clear();
-    this.playersWhoSkippedDobon.clear();
-    this.dobonTriggerPlayerId = undefined;
-    this.dobonCardValue = undefined;
+    this.pendingGaeshiTotalMultiplier = totalMultiplier;
+    this.enterDobonPhase(true);
 
     return { success: true };
   }
@@ -719,9 +823,9 @@ export class GameManager {
 
     this.dobonGaeshiEligiblePlayerIds.delete(playerId);
 
-    // ドボン返しがスキップされたら、ドボンしたプレイヤー全員が勝利
+    // ドボン返しがスキップされたら、ドボン演出フェーズへ
     if (this.dobonGaeshiEligiblePlayerIds.size === 0) {
-      this.finalizeMultipleWinners();
+      this.enterDobonPhase(false);
     }
 
     return { success: true };
@@ -785,7 +889,7 @@ export class GameManager {
   }
 
   isGameOver(): boolean {
-    return this.winners.length > 0;
+    return this.winners.length > 0 && !this.dobonPhase;
   }
 
   isWaitingForDobon(): boolean {
@@ -794,6 +898,10 @@ export class GameManager {
 
   isWaitingForDobonGaeshi(): boolean {
     return this.dobonGaeshiEligiblePlayerIds.size > 0;
+  }
+
+  isInDobonPhase(): boolean {
+    return this.dobonPhase !== undefined;
   }
 
   isWaitingForInitialRateConfirm(): boolean {
@@ -829,6 +937,12 @@ export class GameManager {
     }
     if (this.dobonTriggerPlayerId === oldPlayerId) {
       this.dobonTriggerPlayerId = newPlayerId;
+    }
+    // pendingDobonWinnersのID更新
+    for (const winner of this.pendingDobonWinners) {
+      if (winner.playerId === oldPlayerId) {
+        winner.playerId = newPlayerId;
+      }
     }
   }
 

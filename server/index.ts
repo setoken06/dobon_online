@@ -419,6 +419,39 @@ app.prepare().then(() => {
       }
     });
 
+    // ドボン演出フェーズを進める
+    socket.on('game:advanceDobonPhase', ({ roomId }) => {
+      try {
+        const game = roomStore.getGame(roomId);
+        if (!game) {
+          socket.emit('game:error', { message: 'ゲームが見つかりません' });
+          return;
+        }
+
+        const result = game.advanceDobonPhase(socket.id);
+        if (!result.success) {
+          socket.emit('game:error', { message: result.error || 'フェーズを進められませんでした' });
+          return;
+        }
+
+        // 全プレイヤーに状態を送信
+        broadcastGameState(io, roomId, game);
+
+        // ゲーム終了判定（resultフェーズ完了後）
+        if (game.isGameOver()) {
+          const { winnerId, winnerName } = game.getWinner();
+          if (winnerId && winnerName) {
+            io.to(roomId).emit('game:finished', { winnerId, winnerName });
+            roomStore.setRoomStatus(roomId, 'finished');
+          }
+        }
+      } catch (error) {
+        socket.emit('game:error', {
+          message: error instanceof Error ? error.message : 'エラーが発生しました'
+        });
+      }
+    });
+
     // 初期レートボーナス確認
     socket.on('game:confirmInitialRate', ({ roomId }) => {
       try {
