@@ -122,8 +122,11 @@ export function GameBoard({
       }
 
       // 2枚目以降の選択：同じランクのみ許可（最大4枚）
+      // ジョーカー/ワイルド/UNO記号カードは1枚ずつ
       const firstCard = myPlayer.hand!.find(c => c.id === prev[0]);
-      if (firstCard && firstCard.rank === selectedCard.rank && prev.length < 4) {
+      if (firstCard && firstCard.rank === selectedCard.rank && prev.length < 4
+        && !firstCard.isJoker && !firstCard.unoSpecial && firstCard.suit !== 'wild' && firstCard.suit !== 'joker'
+        && !selectedCard.isJoker && !selectedCard.unoSpecial && selectedCard.suit !== 'wild' && selectedCard.suit !== 'joker') {
         return [...prev, cardId];
       }
 
@@ -500,7 +503,12 @@ export function GameBoard({
             </div>
             {gameState.winningNumbers && gameState.winningNumbers.length > 0 && (
               <div className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg">
-                待ち: {gameState.winningNumbers.sort((a, b) => a - b).join(', ')}
+                待ち: {gameState.winningNumbers.sort((a, b) => a - b).map(n => {
+                  if (n === -1) return 'ドロー2';
+                  if (n === -2) return 'スキップ';
+                  if (n === -3) return 'リバース';
+                  return String(n);
+                }).join(', ')}
               </div>
             )}
           </div>

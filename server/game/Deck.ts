@@ -1,10 +1,16 @@
-import { Card, Suit, Rank, SUITS, RANKS } from '../../src/types/card';
+import { Card, Suit, Rank, SUITS, RANKS, UNO_COLORS, UnoColor, UnoSpecialType, GameMode } from '../../src/types/card';
+
+const UNO_SPECIALS: UnoSpecialType[] = ['draw2', 'skip', 'reverse'];
 
 export class Deck {
   private cards: Card[] = [];
 
-  constructor(jokerCount: number = 0) {
-    this.initialize(jokerCount);
+  constructor(jokerCount: number = 0, gameMode: GameMode = 'classic') {
+    if (gameMode === 'uno') {
+      this.initializeUno();
+    } else {
+      this.initialize(jokerCount);
+    }
   }
 
   private initialize(jokerCount: number): void {
@@ -28,6 +34,63 @@ export class Deck {
         suit: 'joker',
         rank: 0,
         isJoker: true,
+      });
+    }
+  }
+
+  private initializeUno(): void {
+    this.cards = [];
+
+    for (const color of UNO_COLORS) {
+      // 「0」は各色1枚
+      this.cards.push({
+        id: `${color}-0-0`,
+        suit: color,
+        rank: 0,
+      });
+
+      // 「1〜9」は各色2枚ずつ
+      for (let num = 1; num <= 9; num++) {
+        for (let copy = 0; copy < 2; copy++) {
+          this.cards.push({
+            id: `${color}-${num}-${copy}`,
+            suit: color,
+            rank: num as Rank,
+          });
+        }
+      }
+
+      // 記号カード: 各色2枚ずつ
+      for (const special of UNO_SPECIALS) {
+        for (let copy = 0; copy < 2; copy++) {
+          this.cards.push({
+            id: `${color}-${special}-${copy}`,
+            suit: color,
+            rank: 0,
+            unoSpecial: special,
+          });
+        }
+      }
+    }
+
+    // ワイルドカード: 4枚
+    for (let i = 0; i < 4; i++) {
+      this.cards.push({
+        id: `wild-${i}`,
+        suit: 'wild',
+        rank: 0,
+        isJoker: true,
+      });
+    }
+
+    // ワイルドドロー4: 4枚
+    for (let i = 0; i < 4; i++) {
+      this.cards.push({
+        id: `wild4-${i}`,
+        suit: 'wild',
+        rank: 0,
+        isJoker: true,
+        isWild4: true,
       });
     }
   }

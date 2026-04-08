@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { getSocket, connectSocket, disconnectSocket, TypedSocket } from '../lib/socket';
 import { Room, Player } from '../types/room';
 import { GameState } from '../types/game';
-import { Suit } from '../types/card';
+import { Suit, GameMode } from '../types/card';
 
 // セッション管理用のlocalStorageキー
 const SESSION_KEYS = {
@@ -71,7 +71,7 @@ interface UseSocketReturn {
   gameState: GameState | null;
   error: string | null;
   disconnectedPlayers: Map<string, string>;
-  createRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit) => void;
+  createRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode?: GameMode) => void;
   joinRoom: (roomId: string, playerName: string, myMark: Suit) => void;
   rejoinRoom: () => void;
   cancelRejoin: () => void;
@@ -285,10 +285,10 @@ export function useSocket(): UseSocketReturn {
     };
   }, []);
 
-  const createRoom = useCallback((roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit) => {
+  const createRoom = useCallback((roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode?: GameMode) => {
     const sessionId = getOrCreateSessionId();
     saveSessionInfo(roomId, playerName);
-    socket?.emit('room:create', { roomId, playerName, sessionId, jokerCount, rate, myMark });
+    socket?.emit('room:create', { roomId, playerName, sessionId, jokerCount, rate, myMark, gameMode });
   }, [socket]);
 
   const joinRoom = useCallback((roomId: string, playerName: string, myMark: Suit) => {

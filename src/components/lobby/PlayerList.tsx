@@ -22,6 +22,11 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
           <p className="text-gray-600">
             ルームID: <span className="font-mono text-2xl font-bold">{room.id}</span>
           </p>
+          <p className="text-gray-500 text-sm mt-1">
+            モード: <span className={`font-semibold ${room.gameMode === 'uno' ? 'text-orange-600' : 'text-blue-600'}`}>
+              {room.gameMode === 'uno' ? 'UNO' : 'クラシック'}
+            </span>
+          </p>
         </div>
 
         <div className="mb-6">

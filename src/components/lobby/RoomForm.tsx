@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { DEFAULT_ROOM_CONFIG } from '../../types/room';
-import { Suit, SUIT_SYMBOLS } from '../../types/card';
+import { Suit, SUIT_SYMBOLS, GameMode } from '../../types/card';
 
 const STORAGE_KEYS = {
   playerName: 'dobon_playerName',
@@ -10,12 +10,13 @@ const STORAGE_KEYS = {
   jokerCount: 'dobon_jokerCount',
   rate: 'dobon_rate',
   myMark: 'dobon_myMark',
+  gameMode: 'dobon_gameMode',
 };
 
 const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
 
 interface RoomFormProps {
-  onCreateRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit) => void;
+  onCreateRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode: GameMode) => void;
   onJoinRoom: (roomId: string, playerName: string, myMark: Suit) => void;
   error: string | null;
   onClearError: () => void;
@@ -28,6 +29,7 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
   const [jokerCount, setJokerCount] = useState(DEFAULT_ROOM_CONFIG.jokerCount);
   const [rate, setRate] = useState(DEFAULT_ROOM_CONFIG.rate);
   const [myMark, setMyMark] = useState<Suit>('hearts');
+  const [gameMode, setGameMode] = useState<GameMode>(DEFAULT_ROOM_CONFIG.gameMode);
 
   // ローカルストレージから読み込み
   useEffect(() => {
@@ -36,6 +38,7 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
     const savedJokerCount = localStorage.getItem(STORAGE_KEYS.jokerCount);
     const savedRate = localStorage.getItem(STORAGE_KEYS.rate);
     const savedMyMark = localStorage.getItem(STORAGE_KEYS.myMark);
+    const savedGameMode = localStorage.getItem(STORAGE_KEYS.gameMode);
     if (savedName) setPlayerName(savedName);
     if (savedRoomId) setRoomId(savedRoomId);
     if (savedJokerCount) {
@@ -52,6 +55,9 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
     }
     if (savedMyMark && SUITS.includes(savedMyMark as Suit)) {
       setMyMark(savedMyMark as Suit);
+    }
+    if (savedGameMode && (savedGameMode === 'classic' || savedGameMode === 'uno')) {
+      setGameMode(savedGameMode as GameMode);
     }
   }, []);
 
@@ -84,6 +90,11 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
     localStorage.setItem(STORAGE_KEYS.myMark, myMark);
   }, [myMark]);
 
+  // ゲームモードが変更されたらローカルストレージに保存
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.gameMode, gameMode);
+  }, [gameMode]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -98,7 +109,7 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
     }
 
     if (mode === 'create') {
-      onCreateRoom(roomId, playerName.trim(), jokerCount, rate, myMark);
+      onCreateRoom(roomId, playerName.trim(), jokerCount, rate, myMark, gameMode);
     } else if (mode === 'join') {
       onJoinRoom(roomId, playerName.trim(), myMark);
     }
@@ -202,25 +213,58 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
           {/* 部屋作成時のみの設定 */}
           {mode === 'create' && (
             <>
-              {/* ジョーカー枚数設定 */}
+              {/* ゲームモード選択 */}
               <div>
-                <label htmlFor="jokerCount" className="block text-sm font-medium text-gray-700 mb-1">
-                  ジョーカーの枚数
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ゲームモード
                 </label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    id="jokerCount"
-                    min={0}
-                    max={4}
-                    value={jokerCount}
-                    onChange={(e) => setJokerCount(parseInt(e.target.value, 10))}
-                    className="flex-1"
-                  />
-                  <span className="text-xl font-bold text-gray-800 w-8 text-center">{jokerCount}</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGameMode('classic')}
+                    className={`flex-1 py-3 rounded-lg border-2 font-semibold transition ${
+                      gameMode === 'classic'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-300'
+                        : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    クラシック
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGameMode('uno')}
+                    className={`flex-1 py-3 rounded-lg border-2 font-semibold transition ${
+                      gameMode === 'uno'
+                        ? 'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-300'
+                        : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    UNO
+                  </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">0〜4枚から選択できます</p>
               </div>
+
+              {/* ジョーカー枚数設定（クラシックモードのみ） */}
+              {gameMode === 'classic' && (
+                <div>
+                  <label htmlFor="jokerCount" className="block text-sm font-medium text-gray-700 mb-1">
+                    ジョーカーの枚数
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      id="jokerCount"
+                      min={0}
+                      max={4}
+                      value={jokerCount}
+                      onChange={(e) => setJokerCount(parseInt(e.target.value, 10))}
+                      className="flex-1"
+                    />
+                    <span className="text-xl font-bold text-gray-800 w-8 text-center">{jokerCount}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">0〜4枚から選択できます</p>
+                </div>
+              )}
 
               {/* レート設定 */}
               <div>

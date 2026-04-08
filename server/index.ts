@@ -41,7 +41,7 @@ app.prepare().then(() => {
     console.log('Client connected:', socket.id);
 
     // 部屋を作成
-    socket.on('room:create', ({ roomId, playerName, sessionId, jokerCount, rate, myMark }) => {
+    socket.on('room:create', ({ roomId, playerName, sessionId, jokerCount, rate, myMark, gameMode }) => {
       try {
         const host: Player = {
           id: socket.id,
@@ -57,14 +57,15 @@ app.prepare().then(() => {
           : 2;
         // rateが未定義または無効な場合はデフォルト値(100)を使用
         const validRate = typeof rate === 'number' && rate > 0 ? rate : 100;
-        const room = roomStore.createRoom(roomId, host, validJokerCount, validRate);
+        const validGameMode = gameMode === 'uno' ? 'uno' as const : 'classic' as const;
+        const room = roomStore.createRoom(roomId, host, validJokerCount, validRate, validGameMode);
         socket.join(roomId);
         socket.data.roomId = roomId;
         socket.data.playerId = socket.id;
         socket.data.playerName = playerName;
 
         socket.emit('room:created', { room, playerId: socket.id });
-        console.log(`Room created: ${roomId} by ${playerName} (jokers: ${room.jokerCount}, rate: ${room.rate})`);
+        console.log(`Room created: ${roomId} by ${playerName} (mode: ${room.gameMode}, jokers: ${room.jokerCount}, rate: ${room.rate})`);
       } catch (error) {
         socket.emit('room:error', {
           message: error instanceof Error ? error.message : '部屋の作成に失敗しました'

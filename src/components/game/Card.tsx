@@ -1,6 +1,6 @@
 'use client';
 
-import { Card as CardType, SUIT_SYMBOLS, RANK_LABELS, isJokerCard } from '../../types/card';
+import { Card as CardType, SUIT_SYMBOLS, RANK_LABELS, UNO_SPECIAL_LABELS, isJokerCard, isWildCard, isUnoSpecialCard, UnoColor } from '../../types/card';
 
 interface CardProps {
   card: CardType;
@@ -11,6 +11,13 @@ interface CardProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+const UNO_COLOR_CLASSES: Record<UnoColor, { bg: string; border: string; text: string }> = {
+  red: { bg: 'bg-red-500', border: 'border-red-700', text: 'text-white' },
+  blue: { bg: 'bg-blue-500', border: 'border-blue-700', text: 'text-white' },
+  yellow: { bg: 'bg-yellow-400', border: 'border-yellow-600', text: 'text-gray-900' },
+  green: { bg: 'bg-green-500', border: 'border-green-700', text: 'text-white' },
+};
+
 export function Card({
   card,
   onClick,
@@ -20,6 +27,9 @@ export function Card({
   size = 'md',
 }: CardProps) {
   const isJoker = isJokerCard(card);
+  const isWild = isWildCard(card);
+  const isUnoSpecial = isUnoSpecialCard(card);
+  const isUnoColor = card.suit in UNO_COLOR_CLASSES;
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
 
   const sizeClasses = {
@@ -28,7 +38,32 @@ export function Card({
     lg: 'w-20 h-28 text-xl',
   };
 
-  // ジョーカーの場合は特別な表示
+  // ワイルドカード（UNOモード）
+  if (isWild) {
+    const isW4 = card.isWild4;
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`
+          ${sizeClasses[size]}
+          bg-gradient-to-br ${isW4 ? 'from-red-500 via-blue-500 to-green-500' : 'from-purple-500 to-pink-500'} rounded-lg border-2 shadow-md
+          flex flex-col items-center justify-center
+          transition-all duration-200
+          text-white
+          ${selected ? 'border-yellow-400 ring-2 ring-yellow-400 transform -translate-y-2' : 'border-gray-700'}
+          ${playable && !disabled ? 'hover:border-yellow-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer' : ''}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+        `}
+      >
+        <span className="text-xs font-bold">{isW4 ? '+4' : ''}</span>
+        <span className="text-2xl">🌈</span>
+        <span className="text-xs font-bold">WILD</span>
+      </button>
+    );
+  }
+
+  // ジョーカー（クラシックモード）
   if (isJoker) {
     return (
       <button
@@ -50,6 +85,34 @@ export function Card({
     );
   }
 
+  // UNOカード（色付き）
+  if (isUnoColor) {
+    const colorClass = UNO_COLOR_CLASSES[card.suit as UnoColor];
+    const displayText = isUnoSpecial
+      ? UNO_SPECIAL_LABELS[card.unoSpecial!]
+      : String(card.rank);
+
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`
+          ${sizeClasses[size]}
+          ${colorClass.bg} rounded-lg border-2 shadow-md
+          flex flex-col items-center justify-center
+          transition-all duration-200
+          ${colorClass.text}
+          ${selected ? 'border-yellow-400 ring-2 ring-yellow-400 transform -translate-y-2' : colorClass.border}
+          ${playable && !disabled ? 'hover:border-yellow-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer' : ''}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+        `}
+      >
+        <span className="font-bold text-xl">{displayText}</span>
+      </button>
+    );
+  }
+
+  // クラシックカード
   return (
     <button
       onClick={onClick}

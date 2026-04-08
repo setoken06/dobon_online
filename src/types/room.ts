@@ -1,4 +1,4 @@
-import { Suit } from './card';
+import { Suit, GameMode } from './card';
 
 // マイマーク（プレイヤーが選択するマーク）
 export type MyMark = Suit;
@@ -26,6 +26,7 @@ export interface Room {
   minPlayers: number;
   jokerCount: number;   // ジョーカーの枚数（0-4）
   rate: number;         // レート
+  gameMode: GameMode;   // ゲームモード
 }
 
 // 部屋作成時のデフォルト設定
@@ -34,4 +35,5 @@ export const DEFAULT_ROOM_CONFIG = {
   minPlayers: 2,
   jokerCount: 2,
   rate: 100,
+  gameMode: 'classic' as GameMode,
 };

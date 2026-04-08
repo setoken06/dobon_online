@@ -1,6 +1,6 @@
 'use client';
 
-import { Card as CardType, isJokerCard } from '../../types/card';
+import { Card as CardType, isJokerCard, isWildCard } from '../../types/card';
 import { WinnerInfo, LoserInfo, PlayerGameState } from '../../types/game';
 import { Card } from './Card';
 
@@ -35,9 +35,11 @@ export function GameResult({
   dobonTriggerCard,
   winnerPlayers,
 }: GameResultProps) {
-  // ラストドローの最終カード（ジョーカー以外）を取得
-  const lastNonJokerCard = lastDrawCards?.find(c => !isJokerCard(c));
-  const lastDrawValue = lastNonJokerCard ? lastNonJokerCard.rank : 0;
+  // ラストドローの最終カード（ジョーカー/ワイルド以外）を取得
+  const lastNonJokerCard = lastDrawCards?.find(c => !isJokerCard(c) && !isWildCard(c));
+  const lastDrawValue = lastNonJokerCard
+    ? (lastNonJokerCard.unoSpecial ? 10 : lastNonJokerCard.rank)
+    : 0;
 
   // 手札枚数倍率を計算
   const getHandCountMultiplier = (count: number): number => {

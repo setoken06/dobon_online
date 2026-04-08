@@ -1,4 +1,4 @@
-import { Card } from './card';
+import { Card, GameMode } from './card';
 
 // プレイヤーのゲーム状態
 export interface PlayerGameState {
@@ -35,6 +35,7 @@ export interface InitialRateBonus {
 export interface GameState {
   roomId: string;
   status: 'playing' | 'finished';
+  gameMode: GameMode;           // ゲームモード
   players: PlayerGameState[];
   currentPlayerId: string;
   topCard: Card;              // 場の一番上のカード
@@ -72,6 +73,9 @@ export interface GameState {
   dobonWinnerPlayerIds?: string[];          // フェーズ進行ボタンを押せるプレイヤー
   isDobonGaeshi?: boolean;                  // ドボン返しによる勝利か
   dobonTriggerCard?: Card;                  // ドボンの原因となったカード
+  // UNOモード用
+  turnDirection?: 1 | -1;                   // ターン進行方向（1=時計回り, -1=反時計回り）
+  pendingEffect?: 'draw2' | 'draw4' | 'skip'; // 次プレイヤーへの効果
 }
 
 // ゲーム設定

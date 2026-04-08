@@ -1,10 +1,10 @@
-import { Card, Suit } from './card';
+import { Card, Suit, GameMode } from './card';
 import { Room, Player } from './room';
 import { GameState } from './game';
 
 // クライアント → サーバー
 export interface ClientToServerEvents {
-  'room:create': (data: { roomId: string; playerName: string; sessionId: string; jokerCount?: number; rate?: number; myMark: Suit }) => void;
+  'room:create': (data: { roomId: string; playerName: string; sessionId: string; jokerCount?: number; rate?: number; myMark: Suit; gameMode?: GameMode }) => void;
   'room:join': (data: { roomId: string; playerName: string; sessionId: string; myMark: Suit }) => void;
   'room:rejoin': (data: { roomId: string; sessionId: string; playerName: string }) => void;
   'room:leave': (data: { roomId: string }) => void;

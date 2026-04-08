@@ -1,5 +1,6 @@
 import { Room, Player, DEFAULT_ROOM_CONFIG } from '../../src/types/room';
 import { GameManager } from '../game/GameManager';
+import { GameMode } from '../../src/types/card';
 
 export class RoomStore {
   private rooms: Map<string, Room> = new Map();
@@ -9,7 +10,8 @@ export class RoomStore {
     roomId: string,
     host: Player,
     jokerCount: number = DEFAULT_ROOM_CONFIG.jokerCount,
-    rate: number = DEFAULT_ROOM_CONFIG.rate
+    rate: number = DEFAULT_ROOM_CONFIG.rate,
+    gameMode: GameMode = 'classic'
   ): Room {
     if (this.rooms.has(roomId)) {
       throw new Error('この部屋IDは既に使用されています');
@@ -22,8 +24,9 @@ export class RoomStore {
       hostId: host.id,
       maxPlayers: DEFAULT_ROOM_CONFIG.maxPlayers,
       minPlayers: DEFAULT_ROOM_CONFIG.minPlayers,
-      jokerCount: Math.max(0, Math.min(4, jokerCount)), // 0-4に制限
-      rate: Math.max(1, rate), // 最低1
+      jokerCount: Math.max(0, Math.min(4, jokerCount)),
+      rate: Math.max(1, rate),
+      gameMode,
     };
 
     this.rooms.set(roomId, room);
@@ -89,7 +92,7 @@ export class RoomStore {
       throw new Error('部屋が見つかりません');
     }
 
-    const game = new GameManager(roomId, room.players, room.jokerCount, room.rate);
+    const game = new GameManager(roomId, room.players, room.jokerCount, room.rate, room.gameMode);
     this.games.set(roomId, game);
     return game;
   }

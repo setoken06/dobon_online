@@ -1,4 +1,4 @@
-import { Card, canPlayCard, isJokerCard, Suit } from '../../src/types/card';
+import { Card, canPlayCard, isJokerCard, isWildCard, isUnoSpecialCard, Suit, GameMode, UnoColor } from '../../src/types/card';
 import { GameState, PlayerGameState, GAME_CONFIG, WinnerInfo, InitialRateBonus, LoserInfo } from '../../src/types/game';
 import { Player, MyMark } from '../../src/types/room';
 import { Deck } from './Deck';
@@ -21,6 +21,7 @@ interface DobonPlayerInfo {
 
 export class GameManager {
   private roomId: string;
+  private gameMode: GameMode;
   private deck: Deck;
   private players: InternalPlayerState[];
   private discardPile: Card[] = [];
@@ -34,7 +35,7 @@ export class GameManager {
   private lastDrawCards: Card[] = [];
   // ドボン返し関連
   private dobonGaeshiEligiblePlayerIds: Set<string> = new Set();
-  private dobonTriggerPlayerId?: string; // カードを出したプレイヤー（ドボン返し対象）
+  private dobonTriggerPlayerId?: string;
   private dobonCardValue?: number;
   // 最後にカードを出したプレイヤー情報（ツモドボン用）
   private lastDiscardPlayerId?: string;
@@ -51,12 +52,16 @@ export class GameManager {
   private pendingDobonWinners: DobonPlayerInfo[] = [];
   private pendingDobonIsGaeshi: boolean = false;
   private pendingGaeshiTotalMultiplier?: number;
-  private dobonTriggerCard?: Card; // ドボンの原因となったカード
+  private dobonTriggerCard?: Card;
+  // UNOモード用
+  private turnDirection: 1 | -1 = 1; // 1=時計回り, -1=反時計回り
+  private pendingEffect?: 'draw2' | 'draw4' | 'skip'; // 次プレイヤーへの効果
 
-  constructor(roomId: string, players: Player[], jokerCount: number = 0, initialRate: number = 100) {
+  constructor(roomId: string, players: Player[], jokerCount: number = 0, initialRate: number = 100, gameMode: GameMode = 'classic') {
     this.roomId = roomId;
+    this.gameMode = gameMode;
     this.rate = initialRate;
-    this.deck = new Deck(jokerCount);
+    this.deck = new Deck(jokerCount, gameMode);
     this.deck.shuffle();
 
     // プレイヤーの初期化
@@ -78,59 +83,81 @@ export class GameManager {
     this.currentPlayerIndex = Math.floor(Math.random() * this.players.length);
     const firstPlayer = this.players[this.currentPlayerIndex];
 
-    // 場に1枚置く（ジョーカーの場合はもう1枚引いて重ねる）
-    // ジョーカーを引いた場合はレート*2
-    // 最初の手番プレイヤーのマイマークと一致した場合もレート*2
+    // 場に1枚置く
     let firstCard = this.deck.draw();
     if (firstCard) {
-      this.discardPile.push(firstCard);
-
-      // ジョーカーならレート*2
-      if (isJokerCard(firstCard)) {
-        this.rate *= 2;
-        this.initialRateBonuses.push({
-          type: 'joker',
-          card: firstCard,
-          multiplier: 2,
-        });
-      } else {
-        // マイマークと一致ならレート*2
-        if (firstPlayer.myMark && firstCard.suit === firstPlayer.myMark) {
-          this.rate *= 2;
-          this.initialRateBonuses.push({
-            type: 'myMark',
-            card: firstCard,
-            multiplier: 2,
-          });
+      // UNOモードの場合、最初のカードが記号カードなら引き直す（ワイルドはジョーカー扱いでOK）
+      if (this.gameMode === 'uno') {
+        while (firstCard && isUnoSpecialCard(firstCard)) {
+          this.deck.addCards([firstCard]);
+          firstCard = this.deck.draw();
         }
       }
 
-      // ジョーカーの場合、もう1枚引いて重ねる
-      while (isJokerCard(this.discardPile[this.discardPile.length - 1])) {
-        const nextCard = this.deck.draw();
-        if (nextCard) {
-          this.discardPile.push(nextCard);
-          // ジョーカーならレート*2
-          if (isJokerCard(nextCard)) {
+      if (firstCard) {
+        this.discardPile.push(firstCard);
+
+        // 初期レートボーナス処理（ジョーカー/ワイルドの場合）
+        const isJokerLike = this.gameMode === 'uno' ? isWildCard(firstCard) : isJokerCard(firstCard);
+        if (isJokerLike) {
+          this.rate *= 2;
+          this.initialRateBonuses.push({
+            type: 'joker',
+            card: firstCard,
+            multiplier: 2,
+          });
+        } else if (this.gameMode === 'classic') {
+          // マイマークと一致ならレート*2（クラシックのみ）
+          if (firstPlayer.myMark && firstCard.suit === firstPlayer.myMark) {
             this.rate *= 2;
             this.initialRateBonuses.push({
-              type: 'joker',
-              card: nextCard,
+              type: 'myMark',
+              card: firstCard,
               multiplier: 2,
             });
-          } else {
-            // マイマークと一致ならレート*2
-            if (firstPlayer.myMark && nextCard.suit === firstPlayer.myMark) {
+          }
+        }
+
+        // ジョーカー/ワイルドの場合、もう1枚引いて重ねる
+        const isTopJokerLike = () => {
+          const top = this.discardPile[this.discardPile.length - 1];
+          return this.gameMode === 'uno' ? isWildCard(top) : isJokerCard(top);
+        };
+
+        while (isTopJokerLike()) {
+          let nextCard = this.deck.draw();
+
+          // UNOモード: 記号カードが出たら引き直し
+          if (this.gameMode === 'uno') {
+            while (nextCard && isUnoSpecialCard(nextCard)) {
+              this.deck.addCards([nextCard]);
+              nextCard = this.deck.draw();
+            }
+          }
+
+          if (nextCard) {
+            this.discardPile.push(nextCard);
+            const isNextJokerLike = this.gameMode === 'uno' ? isWildCard(nextCard) : isJokerCard(nextCard);
+            if (isNextJokerLike) {
               this.rate *= 2;
               this.initialRateBonuses.push({
-                type: 'myMark',
+                type: 'joker',
                 card: nextCard,
                 multiplier: 2,
               });
+            } else if (this.gameMode === 'classic') {
+              if (firstPlayer.myMark && nextCard.suit === firstPlayer.myMark) {
+                this.rate *= 2;
+                this.initialRateBonuses.push({
+                  type: 'myMark',
+                  card: nextCard,
+                  multiplier: 2,
+                });
+              }
             }
+          } else {
+            break;
           }
-        } else {
-          break;
         }
       }
     }
@@ -146,14 +173,18 @@ export class GameManager {
   }
 
   // 場のジョーカーの下にあるカードを取得（マッチング用）
+  // UNOモードではワイルドは「なんでも出せる」なのでeffectiveTopCard不要
   private getEffectiveTopCard(): Card | undefined {
-    // 捨て札を逆順で走査してジョーカー以外のカードを見つける
     for (let i = this.discardPile.length - 1; i >= 0; i--) {
-      if (!isJokerCard(this.discardPile[i])) {
-        return this.discardPile[i];
+      const card = this.discardPile[i];
+      if (this.gameMode === 'uno') {
+        // UNO: ワイルドの下は探さない（ワイルドはなんでも出せるため）
+        if (!isWildCard(card)) return card;
+      } else {
+        // クラシック: ジョーカー以外を探す
+        if (!isJokerCard(card)) return card;
       }
     }
-    // 全部ジョーカーの場合（ありえないはずだが）
     return undefined;
   }
 
@@ -170,7 +201,9 @@ export class GameManager {
       currentPlayer.isReach = false;
     }
 
-    this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+    // UNOモードのターン方向対応
+    const step = this.gameMode === 'uno' ? this.turnDirection : 1;
+    this.currentPlayerIndex = ((this.currentPlayerIndex + step) % this.players.length + this.players.length) % this.players.length;
     this.hasDrawnThisTurn = false;
     this.dobonablePlayerIds.clear();
   }
@@ -179,23 +212,60 @@ export class GameManager {
     return this.players.find(p => p.playerId === playerId);
   }
 
-  // カードの数値を取得（A=1, J=11, Q=12, K=13, ジョーカー=0）
+  // カードの数値を取得
   private getCardValue(card: Card): number {
+    if (this.gameMode === 'uno') {
+      // UNO記号カードはドボンの数値判定では特殊扱い
+      if (isUnoSpecialCard(card)) return 0; // 記号カードは数値0（特殊ドボンルール参照）
+      if (isWildCard(card)) return 0; // ワイルド系も0
+      return card.rank;
+    }
     return card.rank;
   }
 
-  // 手札からジョーカーを除いたカードを取得
+  // UNOモード: ラストドロー用の数値取得
+  private getLastDrawCardValue(card: Card): number {
+    if (this.gameMode === 'uno') {
+      if (isUnoSpecialCard(card)) return 10; // 記号カード = 10
+      if (isWildCard(card)) return 0; // ワイルド系はジョーカー扱い（performLastDrawで処理）
+      return card.rank;
+    }
+    return card.rank;
+  }
+
+  // 手札からジョーカー/ワイルドを除いたカードを取得
   private getNonJokerCards(hand: Card[]): Card[] {
+    if (this.gameMode === 'uno') {
+      return hand.filter(card => !isWildCard(card));
+    }
     return hand.filter(card => !isJokerCard(card));
   }
 
-  // 手札の合計を計算（ジョーカー除外）
+  // UNOモード: 手札から記号カードを除いたカードを取得（ワイルドも除く）
+  private getNumberOnlyCards(hand: Card[]): Card[] {
+    return hand.filter(card => !isWildCard(card) && !isUnoSpecialCard(card));
+  }
+
+  // UNOモード: 手札の記号カードを取得
+  private getSpecialCards(hand: Card[]): Card[] {
+    return hand.filter(card => isUnoSpecialCard(card));
+  }
+
+  // 手札の合計を計算（ジョーカー/ワイルド除外）
   private calculateHandSum(hand: Card[]): number {
     return this.getNonJokerCards(hand).reduce((sum, card) => sum + this.getCardValue(card), 0);
   }
 
-  // 上がり数字を計算（ジョーカー除外）
+  // 上がり数字を計算
   private calculateWinningNumbers(hand: Card[]): number[] {
+    if (this.gameMode === 'uno') {
+      return this.calculateWinningNumbersUno(hand);
+    }
+    return this.calculateWinningNumbersClassic(hand);
+  }
+
+  // クラシックモードの上がり数字計算
+  private calculateWinningNumbersClassic(hand: Card[]): number[] {
     const nonJokerCards = this.getNonJokerCards(hand);
 
     if (nonJokerCards.length === 0) return [];
@@ -210,19 +280,15 @@ export class GameManager {
       const b = this.getCardValue(nonJokerCards[1]);
       const results = new Set<number>();
 
-      // 足す
       const sum = a + b;
       if (sum >= 1 && sum <= 13) results.add(sum);
 
-      // 引く（両方向）
       const diff1 = Math.abs(a - b);
       if (diff1 >= 1 && diff1 <= 13) results.add(diff1);
 
-      // かける
       const prod = a * b;
       if (prod >= 1 && prod <= 13) results.add(prod);
 
-      // 割る（割り切れる場合のみ）
       if (b !== 0 && a % b === 0) {
         const div = a / b;
         if (div >= 1 && div <= 13) results.add(div);
@@ -235,43 +301,147 @@ export class GameManager {
       return Array.from(results);
     }
 
-    // 3枚以上の場合は合計のみ
     const sum = this.calculateHandSum(hand);
     return sum >= 1 && sum <= 13 ? [sum] : [];
   }
 
-  // リーチ条件をチェック（ジョーカー除外した枚数・合計で判定）
+  // UNOモードの上がり数字計算
+  private calculateWinningNumbersUno(hand: Card[]): number[] {
+    // ワイルド4を持っている場合はドボンできない
+    if (hand.some(card => card.isWild4)) return [];
+
+    const specialCards = this.getSpecialCards(hand);
+    const numberCards = this.getNumberOnlyCards(hand);
+    const wildCards = hand.filter(card => isWildCard(card) && !card.isWild4);
+
+    // 記号カードが2枚以上あるとリーチ不成立
+    if (specialCards.length >= 2) return [];
+
+    if (specialCards.length === 1) {
+      // 記号カード1枚：数字カード（+ワイルド）でリーチが成立している場合、記号カード単独待ち
+      // まず数字カード+ワイルドだけでリーチが成立するか確認
+      const nonSpecialHand = [...numberCards, ...wildCards];
+      if (this.checkReachConditionForCards(nonSpecialHand)) {
+        // 記号カード単独の待ち（=場に同じ記号カードが出ればドボン）
+        // 記号カードのドボンは「場のカードの数値」ではなくカードの種類マッチなので
+        // 特殊な待ち番号として-1（draw2）, -2（skip）, -3（reverse）を使う
+        const special = specialCards[0].unoSpecial!;
+        if (special === 'draw2') return [-1];
+        if (special === 'skip') return [-2];
+        if (special === 'reverse') return [-3];
+      }
+      return [];
+    }
+
+    // 記号カードなし：通常のドボン計算（ワイルドはジョーカー扱い）
+    if (numberCards.length === 0) return [];
+
+    if (numberCards.length === 1) {
+      const value = numberCards[0].rank;
+      return value >= 0 && value <= 9 ? [value] : [];
+    }
+
+    if (numberCards.length === 2) {
+      const a = numberCards[0].rank;
+      const b = numberCards[1].rank;
+      const results = new Set<number>();
+
+      const sum = a + b;
+      if (sum >= 0 && sum <= 9) results.add(sum);
+
+      const diff = Math.abs(a - b);
+      if (diff >= 0 && diff <= 9) results.add(diff);
+
+      const prod = a * b;
+      if (prod >= 0 && prod <= 9) results.add(prod);
+
+      if (b !== 0 && a % b === 0) {
+        const div = a / b;
+        if (div >= 0 && div <= 9) results.add(div);
+      }
+      if (a !== 0 && b % a === 0) {
+        const div = b / a;
+        if (div >= 0 && div <= 9) results.add(div);
+      }
+
+      return Array.from(results);
+    }
+
+    // 3枚以上：合計のみ
+    const sum = numberCards.reduce((s, c) => s + c.rank, 0);
+    return sum >= 0 && sum <= 9 ? [sum] : [];
+  }
+
+  // リーチ条件をチェック
   private checkReachCondition(hand: Card[]): boolean {
+    if (this.gameMode === 'uno') {
+      return this.checkReachConditionUno(hand);
+    }
+
     const nonJokerCards = this.getNonJokerCards(hand);
-
-    // ジョーカー以外が2枚以下
     if (nonJokerCards.length <= 2) return true;
-
-    // ジョーカー以外の合計が13以下
     const sum = this.calculateHandSum(hand);
     return sum <= 13;
   }
 
-  // ドボン可能かチェック（特定のプレイヤーが特定のカードに対して）
+  // UNOモード用リーチチェック
+  private checkReachConditionUno(hand: Card[]): boolean {
+    // ワイルド4を持っている場合はドボンできない
+    if (hand.some(card => card.isWild4)) return false;
+
+    const specialCards = this.getSpecialCards(hand);
+
+    // 記号カード2枚以上はリーチ不成立
+    if (specialCards.length >= 2) return false;
+
+    if (specialCards.length === 1) {
+      // 記号カード以外でリーチが成立しているかチェック
+      const nonSpecialHand = hand.filter(c => !isUnoSpecialCard(c));
+      return this.checkReachConditionForCards(nonSpecialHand);
+    }
+
+    // 記号カードなし：通常判定
+    return this.checkReachConditionForCards(hand);
+  }
+
+  // カード群に対するリーチ判定（ワイルドはジョーカー扱い）
+  private checkReachConditionForCards(cards: Card[]): boolean {
+    const numberCards = cards.filter(c => !isWildCard(c) && !isUnoSpecialCard(c));
+    if (numberCards.length <= 2) return true;
+    const sum = numberCards.reduce((s, c) => s + c.rank, 0);
+    return this.gameMode === 'uno' ? sum <= 9 : sum <= 13;
+  }
+
+  // ドボン可能かチェック
   private checkDobonCondition(playerId: string, targetCardValue: number): boolean {
     const player = this.findPlayer(playerId);
     if (!player) return false;
 
-    // リーチ状態でなければドボンできない
     if (!player.isReach) return false;
 
-    // ジョーカーではドボンできない
-    if (targetCardValue === 0) return false;
+    // クラシック: ジョーカーではドボンできない
+    if (this.gameMode === 'classic' && targetCardValue === 0) return false;
 
-    // 上がり数字に含まれているか
     const winningNumbers = this.calculateWinningNumbers(player.hand);
     return winningNumbers.includes(targetCardValue);
+  }
+
+  // UNOモード: 記号カードに対するドボンチェック
+  private checkDobonConditionForSpecial(playerId: string, card: Card): boolean {
+    if (this.gameMode !== 'uno' || !isUnoSpecialCard(card)) return false;
+
+    const player = this.findPlayer(playerId);
+    if (!player) return false;
+    if (!player.isReach) return false;
+
+    const winningNumbers = this.calculateWinningNumbers(player.hand);
+    const specialValue = card.unoSpecial === 'draw2' ? -1 : card.unoSpecial === 'skip' ? -2 : -3;
+    return winningNumbers.includes(specialValue);
   }
 
   // 指定プレイヤー視点のゲーム状態を取得
   getStateForPlayer(playerId: string): GameState {
     const player = this.findPlayer(playerId);
-    // ドボン演出中（success/lastDraw/result）は勝者の手札を全員に公開
     const showWinnerHands = !!this.dobonPhase;
     const winnerPlayerIdSet = showWinnerHands
       ? new Set(this.pendingDobonWinners.map(w => w.playerId))
@@ -287,28 +457,27 @@ export class GameManager {
     const canDobon = this.dobonablePlayerIds.has(playerId);
     const canDobonGaeshi = this.dobonGaeshiEligiblePlayerIds.has(playerId);
 
-    // リーチ状態なら待ち数字を計算（自分のみ）
     let winningNumbers: number[] | undefined;
     if (player?.isReach) {
       winningNumbers = this.calculateWinningNumbers(player.hand);
     }
 
-    // 8枚以上で出せるカードがあるか
     const isCurrentPlayer = this.getCurrentPlayer().playerId === playerId;
     const hasPlayableCard = player ? this.getPlayableCards(playerId).length > 0 : false;
     const mustPlayCard = isCurrentPlayer && (player?.hand.length ?? 0) >= 8 && hasPlayableCard;
 
     const topCard = this.getTopCard();
-    const effectiveTopCard = isJokerCard(topCard) ? this.getEffectiveTopCard() : undefined;
+    // UNOモード: ワイルドは「なんでも出せる」のでeffectiveTopCard不要
+    // クラシック: ジョーカーの場合のみeffectiveTopCardを使う
+    const effectiveTopCard = this.gameMode === 'uno'
+      ? undefined // UNOではワイルドの下を参照しない（canPlayCardで処理）
+      : (isJokerCard(topCard) ? this.getEffectiveTopCard() : undefined);
 
-    // ドボンしたプレイヤー情報（ドボン返し時に表示用）
     const dobonPlayerIds = Array.from(this.playersWhoDoboned.keys());
     const dobonPlayerNames = Array.from(this.playersWhoDoboned.values()).map(p => p.playerName);
 
-    // 後方互換性のための単独勝者情報
     const firstWinner = this.winners.length > 0 ? this.winners[0] : undefined;
 
-    // ドボン演出フェーズの勝者プレイヤーID一覧
     const dobonWinnerPlayerIds = this.dobonPhase
       ? this.pendingDobonWinners.map(w => w.playerId)
       : undefined;
@@ -316,6 +485,7 @@ export class GameManager {
     return {
       roomId: this.roomId,
       status: this.winners.length > 0 && !this.dobonPhase ? 'finished' : 'playing',
+      gameMode: this.gameMode,
       players: playerStates,
       currentPlayerId: this.getCurrentPlayer().playerId,
       topCard,
@@ -326,35 +496,30 @@ export class GameManager {
       canDobonGaeshi,
       winningNumbers,
       mustPlayCard,
-      // 複数勝者対応
       winners: this.winners.length > 0 ? this.winners : undefined,
-      // 敗者情報
       loser: this.loser,
-      // 後方互換性
       winnerId: firstWinner?.playerId,
       winnerName: firstWinner?.playerName,
       finalScore: firstWinner?.finalScore,
       winnerHandCount: firstWinner?.handCount,
       rate: this.rate,
       lastDrawCards: this.lastDrawCards.length > 0 ? this.lastDrawCards : undefined,
-      // ドボン返し関連
       dobonPlayerIds: dobonPlayerIds.length > 0 ? dobonPlayerIds : undefined,
       dobonPlayerNames: dobonPlayerNames.length > 0 ? dobonPlayerNames : undefined,
-      // 後方互換性（単独ドボン時用）
       dobonPlayerId: dobonPlayerIds.length > 0 ? dobonPlayerIds[0] : undefined,
       dobonPlayerName: dobonPlayerNames.length > 0 ? dobonPlayerNames[0] : undefined,
-      // 初期レートボーナス関連
       initialRateBonuses: this.initialRateBonuses.length > 0 ? this.initialRateBonuses : undefined,
       waitingForInitialRateConfirm: this.waitingForInitialRateConfirm,
       initialRateConfirmPlayerId: this.waitingForInitialRateConfirm ? this.getCurrentPlayer().playerId : undefined,
-      // ドボン待機関連（自分がドボン/ドボン返しの権利を持っていない場合は隠す）
       isWaitingForDobon: this.dobonablePlayerIds.has(playerId),
       isWaitingForDobonGaeshi: this.dobonGaeshiEligiblePlayerIds.has(playerId),
-      // ドボン演出フェーズ
       dobonPhase: this.dobonPhase,
       dobonWinnerPlayerIds,
       isDobonGaeshi: this.dobonPhase ? this.pendingDobonIsGaeshi : undefined,
       dobonTriggerCard: this.dobonPhase ? this.dobonTriggerCard : undefined,
+      // UNOモード用
+      turnDirection: this.gameMode === 'uno' ? this.turnDirection : undefined,
+      pendingEffect: this.pendingEffect,
     };
   }
 
@@ -368,24 +533,89 @@ export class GameManager {
     return player.hand.filter(card => canPlayCard(card, topCard, effectiveTopCard));
   }
 
-  // 手札からジョーカーを取得
+  // 手札からジョーカー/ワイルドを取得
   private getJokerFromHand(hand: Card[]): Card | undefined {
+    if (this.gameMode === 'uno') {
+      return hand.find(card => isWildCard(card));
+    }
     return hand.find(card => isJokerCard(card));
   }
 
-  // カードを出す（複数枚対応：同じ数字なら2枚まで同時に出せる）
+  // UNOモード: カード効果を適用
+  private applyUnoCardEffect(card: Card): void {
+    if (this.gameMode !== 'uno') return;
+
+    if (card.unoSpecial === 'draw2') {
+      this.pendingEffect = 'draw2';
+    } else if (card.unoSpecial === 'skip') {
+      this.pendingEffect = 'skip';
+    } else if (card.unoSpecial === 'reverse') {
+      this.turnDirection *= -1;
+      // 2人プレイの場合はスキップと同等
+      if (this.players.length === 2) {
+        this.pendingEffect = 'skip';
+      }
+    } else if (card.isWild4) {
+      this.pendingEffect = 'draw4';
+    }
+  }
+
+  // UNOモード: 次のターン開始時に効果を適用
+  private applyPendingEffect(): void {
+    if (!this.pendingEffect) return;
+
+    const currentPlayer = this.getCurrentPlayer();
+
+    if (this.pendingEffect === 'draw2') {
+      // 2枚引く
+      this.refillDeckIfNeeded();
+      const drawn = this.deck.drawMultiple(2);
+      currentPlayer.hand.push(...drawn);
+      // パスしか行えない → 次のターンへ
+      this.pendingEffect = undefined;
+      this.nextTurn();
+      return;
+    }
+
+    if (this.pendingEffect === 'draw4') {
+      // 4枚引く
+      this.refillDeckIfNeeded();
+      const drawn = this.deck.drawMultiple(4);
+      currentPlayer.hand.push(...drawn);
+      // 出番を終了 → 次のターンへ
+      this.pendingEffect = undefined;
+      this.nextTurn();
+      return;
+    }
+
+    if (this.pendingEffect === 'skip') {
+      // パスしか行えない → 次のターンへ
+      this.pendingEffect = undefined;
+      this.nextTurn();
+      return;
+    }
+  }
+
+  // 山札が空なら捨て札を戻す
+  private refillDeckIfNeeded(): void {
+    if (this.deck.isEmpty() && this.discardPile.length > 1) {
+      const topCard = this.discardPile.pop()!;
+      this.deck.addCards(this.discardPile);
+      this.discardPile = [topCard];
+      this.rate *= 2;
+    }
+  }
+
+  // カードを出す（複数枚対応）
   playCards(playerId: string, cardIds: string[]): { success: boolean; error?: string } {
-    // ドボン演出フェーズ中はカードを出せない
     if (this.dobonPhase) {
       return { success: false, error: 'ドボン演出中です' };
     }
 
-    // ドボン/ドボン返し待機中はカードを出せない
     if (this.dobonablePlayerIds.size > 0 || this.dobonGaeshiEligiblePlayerIds.size > 0) {
       return { success: false, error: 'ドボンの判定中です' };
     }
 
-    // 初期レート確認待ちの場合はカードを出せない
     if (this.waitingForInitialRateConfirm) {
       return { success: false, error: '初期レートの確認を待っています' };
     }
@@ -413,14 +643,28 @@ export class GameManager {
       cards.push(card);
     }
 
-    // 複数枚の場合、同じ数字かチェック（ジョーカーは単独でしか出せない）
+    // 複数枚の場合のバリデーション
     if (cards.length >= 2) {
-      if (cards.some(c => isJokerCard(c))) {
-        return { success: false, error: 'ジョーカーは1枚ずつしか出せません' };
-      }
-      const firstRank = cards[0].rank;
-      if (!cards.every(c => c.rank === firstRank)) {
-        return { success: false, error: '同時に出せるのは同じ数字のカードのみです' };
+      if (this.gameMode === 'uno') {
+        // UNOモード: ワイルド系は1枚ずつ、記号カードも1枚ずつ
+        if (cards.some(c => isWildCard(c))) {
+          return { success: false, error: 'ワイルドカードは1枚ずつしか出せません' };
+        }
+        if (cards.some(c => isUnoSpecialCard(c))) {
+          return { success: false, error: '記号カードは1枚ずつしか出せません' };
+        }
+        const firstRank = cards[0].rank;
+        if (!cards.every(c => c.rank === firstRank)) {
+          return { success: false, error: '同時に出せるのは同じ数字のカードのみです' };
+        }
+      } else {
+        if (cards.some(c => isJokerCard(c))) {
+          return { success: false, error: 'ジョーカーは1枚ずつしか出せません' };
+        }
+        const firstRank = cards[0].rank;
+        if (!cards.every(c => c.rank === firstRank)) {
+          return { success: false, error: '同時に出せるのは同じ数字のカードのみです' };
+        }
       }
     }
 
@@ -432,50 +676,76 @@ export class GameManager {
       return { success: false, error: 'そのカードは出せません' };
     }
 
-    // カードを出す（手札から削除して捨て札に追加）
+    // カードを出す
     for (const card of cards) {
       const cardIndex = currentPlayer.hand.findIndex(c => c.id === card.id);
       currentPlayer.hand.splice(cardIndex, 1);
       this.discardPile.push(card);
     }
 
-    // 最後にカードを出したプレイヤーを記録（ツモドボン用）
     this.lastDiscardPlayerId = playerId;
     this.lastDiscardPlayerName = currentPlayer.playerName;
 
-    // カードを出した後、リーチ状態を更新（ドボン返し判定のため）
+    // リーチ状態を更新
     if (this.checkReachCondition(currentPlayer.hand)) {
       currentPlayer.isReach = true;
     } else {
       currentPlayer.isReach = false;
     }
 
-    // ドボン可能なプレイヤーをチェック（最後に出したカードの数字で判定）
+    // UNOモード: カード効果を適用
+    const lastCard = cards[cards.length - 1];
+    if (this.gameMode === 'uno') {
+      this.applyUnoCardEffect(lastCard);
+    }
+
+    // ドボン可能なプレイヤーをチェック
     this.dobonablePlayerIds.clear();
     this.playersWhoDoboned.clear();
     this.playersWhoSkippedDobon.clear();
-    this.isTsumoDobon = false; // 通常ドボンなのでフラグをリセット
-    const lastCard = cards[cards.length - 1];
+    this.isTsumoDobon = false;
     const cardValue = this.getCardValue(lastCard);
 
-    // ジョーカーでなければドボンチェック
-    if (!isJokerCard(lastCard)) {
-      for (const player of this.players) {
-        if (player.playerId !== playerId && this.checkDobonCondition(player.playerId, cardValue)) {
-          this.dobonablePlayerIds.add(player.playerId);
+    if (this.gameMode === 'uno') {
+      // UNOモード: 記号カードはcheckDobonConditionForSpecialで判定
+      if (isUnoSpecialCard(lastCard)) {
+        for (const player of this.players) {
+          if (player.playerId !== playerId && this.checkDobonConditionForSpecial(player.playerId, lastCard)) {
+            this.dobonablePlayerIds.add(player.playerId);
+          }
+        }
+      } else if (!isWildCard(lastCard)) {
+        // 数字カード
+        for (const player of this.players) {
+          if (player.playerId !== playerId && this.checkDobonCondition(player.playerId, cardValue)) {
+            this.dobonablePlayerIds.add(player.playerId);
+          }
+        }
+      }
+      // ワイルド系ではドボンチェックしない
+    } else {
+      // クラシックモード
+      if (!isJokerCard(lastCard)) {
+        for (const player of this.players) {
+          if (player.playerId !== playerId && this.checkDobonCondition(player.playerId, cardValue)) {
+            this.dobonablePlayerIds.add(player.playerId);
+          }
         }
       }
     }
 
-    // ドボン可能なプレイヤーがいる場合、トリガープレイヤーを記録
     if (this.dobonablePlayerIds.size > 0) {
       this.dobonTriggerPlayerId = playerId;
       this.dobonCardValue = cardValue;
     } else {
-      // ドボン可能なプレイヤーがいなければ次のターンへ
       this.dobonTriggerPlayerId = undefined;
       this.dobonCardValue = undefined;
       this.nextTurn();
+
+      // UNOモード: 効果適用
+      if (this.pendingEffect) {
+        this.applyPendingEffect();
+      }
     }
 
     return { success: true };
@@ -483,17 +753,14 @@ export class GameManager {
 
   // カードを引く
   drawCard(playerId: string): { success: boolean; card?: Card; error?: string; mustDrawAgain?: boolean; mustPlayJoker?: boolean } {
-    // ドボン演出フェーズ中はカードを引けない
     if (this.dobonPhase) {
       return { success: false, error: 'ドボン演出中です' };
     }
 
-    // ドボン/ドボン返し待機中はカードを引けない
     if (this.dobonablePlayerIds.size > 0 || this.dobonGaeshiEligiblePlayerIds.size > 0) {
       return { success: false, error: 'ドボンの判定中です' };
     }
 
-    // 初期レート確認待ちの場合はカードを引けない
     if (this.waitingForInitialRateConfirm) {
       return { success: false, error: '初期レートの確認を待っています' };
     }
@@ -503,7 +770,6 @@ export class GameManager {
       return { success: false, error: 'あなたのターンではありません' };
     }
 
-    // 通常は1回だけ引ける。ただし8枚以上で出せるカードがない場合は複数回引ける
     if (this.hasDrawnThisTurn) {
       const playableCards = this.getPlayableCards(playerId);
       if (currentPlayer.hand.length < 7 || playableCards.length > 0) {
@@ -511,13 +777,7 @@ export class GameManager {
       }
     }
 
-    // 山札が空なら捨て札を戻す（レート*2）
-    if (this.deck.isEmpty() && this.discardPile.length > 1) {
-      const topCard = this.discardPile.pop()!;
-      this.deck.addCards(this.discardPile);
-      this.discardPile = [topCard];
-      this.rate *= 2; // デッキリシャッフルでレート*2
-    }
+    this.refillDeckIfNeeded();
 
     const card = this.deck.draw();
     if (!card) {
@@ -528,16 +788,23 @@ export class GameManager {
     currentPlayer.hand.push(card);
     this.hasDrawnThisTurn = true;
 
-    // リーチ状態で、場のカードで上がり数字になった場合はドボン可能（ツモドボン）
+    // ツモドボンチェック
     this.dobonablePlayerIds.clear();
     this.isTsumoDobon = false;
     if (currentPlayer.isReach) {
       const effectiveCard = this.getEffectiveTopCard();
       if (effectiveCard) {
-        const topCardValue = this.getCardValue(effectiveCard);
-        if (this.checkDobonCondition(playerId, topCardValue)) {
-          this.dobonablePlayerIds.add(playerId);
-          this.isTsumoDobon = true; // ツモドボンフラグを立てる
+        if (this.gameMode === 'uno' && isUnoSpecialCard(effectiveCard)) {
+          if (this.checkDobonConditionForSpecial(playerId, effectiveCard)) {
+            this.dobonablePlayerIds.add(playerId);
+            this.isTsumoDobon = true;
+          }
+        } else {
+          const topCardValue = this.getCardValue(effectiveCard);
+          if (this.checkDobonCondition(playerId, topCardValue)) {
+            this.dobonablePlayerIds.add(playerId);
+            this.isTsumoDobon = true;
+          }
         }
       }
     }
@@ -546,12 +813,10 @@ export class GameManager {
     const playableAfterDraw = this.getPlayableCards(playerId);
 
     if (currentPlayer.hand.length >= 8 && playableAfterDraw.length === 0) {
-      // ジョーカーがあれば強制的に出す
       const joker = this.getJokerFromHand(currentPlayer.hand);
       if (joker) {
         return { success: true, card, mustPlayJoker: true };
       }
-      // ジョーカーがなければ続けて引く
       return { success: true, card, mustDrawAgain: true };
     }
 
@@ -560,12 +825,10 @@ export class GameManager {
 
   // パス
   pass(playerId: string): { success: boolean; error?: string } {
-    // ドボン演出フェーズ中はパスできない
     if (this.dobonPhase) {
       return { success: false, error: 'ドボン演出中です' };
     }
 
-    // ドボン/ドボン返し待機中はパスできない
     if (this.dobonablePlayerIds.size > 0 || this.dobonGaeshiEligiblePlayerIds.size > 0) {
       return { success: false, error: 'ドボンの判定中です' };
     }
@@ -579,7 +842,6 @@ export class GameManager {
       return { success: false, error: '先にカードを引いてください' };
     }
 
-    // 8枚以上で出せるカードがある場合はパス不可
     if (currentPlayer.hand.length >= 8) {
       const playableCards = this.getPlayableCards(playerId);
       if (playableCards.length > 0) {
@@ -591,7 +853,7 @@ export class GameManager {
     return { success: true };
   }
 
-  // ドボン（全員が選択完了後に勝敗決定）
+  // ドボン
   dobon(playerId: string): { success: boolean; error?: string; allResponded?: boolean } {
     if (!this.dobonablePlayerIds.has(playerId)) {
       return { success: false, error: 'ドボンできません' };
@@ -602,7 +864,6 @@ export class GameManager {
       return { success: false, error: 'プレイヤーが見つかりません' };
     }
 
-    // ドボンを選択
     this.playersWhoDoboned.set(playerId, {
       playerId,
       playerName: player.playerName,
@@ -610,7 +871,6 @@ export class GameManager {
     });
     this.dobonablePlayerIds.delete(playerId);
 
-    // 全員が選択完了したかチェック
     if (this.dobonablePlayerIds.size === 0) {
       return this.resolveDobonPhase();
     }
@@ -627,7 +887,6 @@ export class GameManager {
     this.playersWhoSkippedDobon.add(playerId);
     this.dobonablePlayerIds.delete(playerId);
 
-    // 全員が選択完了したかチェック
     if (this.dobonablePlayerIds.size === 0) {
       return this.resolveDobonPhase();
     }
@@ -637,27 +896,43 @@ export class GameManager {
 
   // 全員のドボン選択完了後の処理
   private resolveDobonPhase(): { success: boolean; allResponded: boolean } {
-    // 誰もドボンしなかった場合
     if (this.playersWhoDoboned.size === 0) {
       this.dobonTriggerPlayerId = undefined;
       this.dobonCardValue = undefined;
       this.nextTurn();
+
+      // UNOモード: 効果適用
+      if (this.pendingEffect) {
+        this.applyPendingEffect();
+      }
+
       return { success: true, allResponded: true };
     }
 
-    // ドボン返しチェック（カードを出したプレイヤーがドボン返しできるか）
-    if (this.dobonTriggerPlayerId && this.dobonCardValue) {
+    // ドボン返しチェック
+    if (this.dobonTriggerPlayerId && this.dobonCardValue !== undefined) {
       const triggerPlayer = this.findPlayer(this.dobonTriggerPlayerId);
-      if (triggerPlayer &&
-          triggerPlayer.isReach &&
-          this.checkDobonCondition(this.dobonTriggerPlayerId, this.dobonCardValue)) {
-        // ドボン返し可能
-        this.dobonGaeshiEligiblePlayerIds.add(this.dobonTriggerPlayerId);
-        return { success: true, allResponded: true };
+      if (triggerPlayer && triggerPlayer.isReach) {
+        let canGaeshi = false;
+
+        if (this.gameMode === 'uno') {
+          const topCard = this.getTopCard();
+          if (isUnoSpecialCard(topCard)) {
+            canGaeshi = this.checkDobonConditionForSpecial(this.dobonTriggerPlayerId, topCard);
+          } else {
+            canGaeshi = this.checkDobonCondition(this.dobonTriggerPlayerId, this.dobonCardValue);
+          }
+        } else {
+          canGaeshi = this.checkDobonCondition(this.dobonTriggerPlayerId, this.dobonCardValue);
+        }
+
+        if (canGaeshi) {
+          this.dobonGaeshiEligiblePlayerIds.add(this.dobonTriggerPlayerId);
+          return { success: true, allResponded: true };
+        }
       }
     }
 
-    // ドボン返しできない場合、ドボン演出フェーズへ
     this.enterDobonPhase(false);
     return { success: true, allResponded: true };
   }
@@ -666,24 +941,21 @@ export class GameManager {
   private enterDobonPhase(isGaeshi: boolean): void {
     this.dobonPhase = 'success';
     this.pendingDobonIsGaeshi = isGaeshi;
-    // ドボンの原因となったカード（場の一番上）を記録
     this.dobonTriggerCard = this.getTopCard();
 
-    if (isGaeshi) {
-      // ドボン返しの場合：gaeshi player が勝者（pendingDobonWinnersは呼び出し元で設定済み）
-    } else {
-      // 通常ドボンの場合：ドボンしたプレイヤー全員が勝者
+    // 効果をクリア（ドボン成立時は効果無視）
+    this.pendingEffect = undefined;
+
+    if (!isGaeshi) {
       this.pendingDobonWinners = Array.from(this.playersWhoDoboned.values());
     }
 
-    // 敗者情報を設定
     this.setLoserInfo();
   }
 
   // 敗者情報を設定
   private setLoserInfo(): void {
     if (this.pendingDobonIsGaeshi) {
-      // ドボン返しの場合、敗者はドボンを仕掛けたプレイヤーたち
       const dobonPlayerNames = Array.from(this.playersWhoDoboned.values()).map(p => p.playerName);
       const firstDobonPlayer = Array.from(this.playersWhoDoboned.values())[0];
       if (firstDobonPlayer) {
@@ -711,13 +983,12 @@ export class GameManager {
     }
   }
 
-  // ドボン演出フェーズを進める（勝者のみ操作可能）
+  // ドボン演出フェーズを進める
   advanceDobonPhase(playerId: string): { success: boolean; error?: string } {
     if (!this.dobonPhase) {
       return { success: false, error: 'ドボン演出中ではありません' };
     }
 
-    // 勝者のみ操作可能
     const isWinner = this.pendingDobonWinners.some(w => w.playerId === playerId);
     if (!isWinner) {
       return { success: false, error: 'ドボン成功者のみ操作できます' };
@@ -729,7 +1000,6 @@ export class GameManager {
     }
 
     if (this.dobonPhase === 'lastDraw') {
-      // ラストドロー実行 & スコア計算
       this.performLastDraw();
       this.calculateFinalScores();
       this.dobonPhase = 'result';
@@ -737,7 +1007,6 @@ export class GameManager {
     }
 
     if (this.dobonPhase === 'result') {
-      // 演出終了 → ゲーム終了状態へ
       this.dobonPhase = undefined;
       this.pendingDobonWinners = [];
       this.pendingDobonIsGaeshi = false;
@@ -753,13 +1022,16 @@ export class GameManager {
     return { success: false, error: '不明なフェーズです' };
   }
 
-  // スコア計算（ラストドロー後に呼ぶ）
+  // スコア計算
   private calculateFinalScores(): void {
-    const lastNonJokerCard = this.lastDrawCards.find(c => !isJokerCard(c));
-    const lastDrawValue = lastNonJokerCard ? this.getCardValue(lastNonJokerCard) : 0;
+    const lastNonJokerCard = this.gameMode === 'uno'
+      ? this.lastDrawCards.find(c => !isWildCard(c))
+      : this.lastDrawCards.find(c => !isJokerCard(c));
+    const lastDrawValue = lastNonJokerCard
+      ? (this.gameMode === 'uno' ? this.getLastDrawCardValue(lastNonJokerCard) : this.getCardValue(lastNonJokerCard))
+      : 0;
 
     if (this.pendingDobonIsGaeshi && this.pendingGaeshiTotalMultiplier !== undefined) {
-      // ドボン返しの場合
       const gaeshiWinner = this.pendingDobonWinners[0];
       const score = this.rate * lastDrawValue * this.pendingGaeshiTotalMultiplier;
       this.winners = [{
@@ -769,7 +1041,6 @@ export class GameManager {
         finalScore: score,
       }];
     } else {
-      // 通常ドボンの場合
       this.winners = [];
       for (const dobonInfo of this.pendingDobonWinners) {
         const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
@@ -795,7 +1066,6 @@ export class GameManager {
       return { success: false, error: 'プレイヤーが見つかりません' };
     }
 
-    // ドボン返し成功：倍率は自分の倍率 + ドボンした全プレイヤーの倍率
     let totalMultiplier = this.getHandCountMultiplier(player.hand.length);
     for (const [, dobonInfo] of this.playersWhoDoboned) {
       totalMultiplier += this.getHandCountMultiplier(dobonInfo.handCount);
@@ -803,7 +1073,6 @@ export class GameManager {
 
     this.dobonGaeshiEligiblePlayerIds.clear();
 
-    // ドボン返し勝者を設定してフェーズに入る
     this.pendingDobonWinners = [{
       playerId: player.playerId,
       playerName: player.playerName,
@@ -823,7 +1092,6 @@ export class GameManager {
 
     this.dobonGaeshiEligiblePlayerIds.delete(playerId);
 
-    // ドボン返しがスキップされたら、ドボン演出フェーズへ
     if (this.dobonGaeshiEligiblePlayerIds.size === 0) {
       this.enterDobonPhase(false);
     }
@@ -835,34 +1103,20 @@ export class GameManager {
   private performLastDraw(): void {
     this.lastDrawCards = [];
 
-    // 山札が空なら捨て札を戻す（レート*2）
-    if (this.deck.isEmpty() && this.discardPile.length > 1) {
-      const topCard = this.discardPile.pop()!;
-      this.deck.addCards(this.discardPile);
-      this.discardPile = [topCard];
-      this.rate *= 2;
-    }
+    this.refillDeckIfNeeded();
 
-    // ジョーカー以外が出るまで引く
     let lastDrawCard = this.deck.draw();
     while (lastDrawCard) {
       this.lastDrawCards.push(lastDrawCard);
 
-      if (isJokerCard(lastDrawCard)) {
-        // ジョーカーならレート*2してもう一枚引く
+      const isJokerLike = this.gameMode === 'uno' ? isWildCard(lastDrawCard) : isJokerCard(lastDrawCard);
+
+      if (isJokerLike) {
+        // ジョーカー/ワイルドならレート*2してもう一枚引く
         this.rate *= 2;
-
-        // 山札が空なら捨て札を戻す（レート*2）
-        if (this.deck.isEmpty() && this.discardPile.length > 1) {
-          const topCard = this.discardPile.pop()!;
-          this.deck.addCards(this.discardPile);
-          this.discardPile = [topCard];
-          this.rate *= 2;
-        }
-
+        this.refillDeckIfNeeded();
         lastDrawCard = this.deck.draw();
       } else {
-        // ジョーカー以外が出たら終了
         break;
       }
     }
@@ -870,16 +1124,15 @@ export class GameManager {
 
   // 手札枚数に応じた倍率を取得
   private getHandCountMultiplier(handCount: number): number {
-    if (handCount === 1) return 2;  // 1枚 = 2倍
-    if (handCount === 2) return 1;  // 2枚 = 1倍
-    return handCount;               // 3枚以上 = 枚数倍
+    if (handCount === 1) return 2;
+    if (handCount === 2) return 1;
+    return handCount;
   }
 
   getWinner(): { winnerId?: string; winnerName?: string; winners?: WinnerInfo[] } {
     if (this.winners.length === 0) {
       return {};
     }
-    // 後方互換性のため単独勝者の場合は winnerId/winnerName も返す
     const firstWinner = this.winners[0];
     return {
       winnerId: firstWinner.playerId,
@@ -916,7 +1169,6 @@ export class GameManager {
     const oldPlayerId = player.playerId;
     player.playerId = newPlayerId;
 
-    // ドボン関連のIDも更新
     if (this.dobonablePlayerIds.has(oldPlayerId)) {
       this.dobonablePlayerIds.delete(oldPlayerId);
       this.dobonablePlayerIds.add(newPlayerId);
@@ -938,7 +1190,6 @@ export class GameManager {
     if (this.dobonTriggerPlayerId === oldPlayerId) {
       this.dobonTriggerPlayerId = newPlayerId;
     }
-    // pendingDobonWinnersのID更新
     for (const winner of this.pendingDobonWinners) {
       if (winner.playerId === oldPlayerId) {
         winner.playerId = newPlayerId;
