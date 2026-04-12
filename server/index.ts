@@ -479,6 +479,29 @@ app.prepare().then(() => {
       }
     });
 
+    // ワイルド使用後の色選択
+    socket.on('game:chooseColor', ({ roomId, color }) => {
+      try {
+        const game = roomStore.getGame(roomId);
+        if (!game) {
+          socket.emit('game:error', { message: 'ゲームが見つかりません' });
+          return;
+        }
+
+        const result = game.chooseColor(socket.id, color);
+        if (!result.success) {
+          socket.emit('game:error', { message: result.error || '色を選択できませんでした' });
+          return;
+        }
+
+        broadcastGameState(io, roomId, game);
+      } catch (error) {
+        socket.emit('game:error', {
+          message: error instanceof Error ? error.message : 'エラーが発生しました'
+        });
+      }
+    });
+
     // 待機画面に戻る
     socket.on('game:backToLobby', ({ roomId }) => {
       try {

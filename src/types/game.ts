@@ -76,6 +76,8 @@ export interface GameState {
   // UNOモード用
   turnDirection?: 1 | -1;                   // ターン進行方向（1=時計回り, -1=反時計回り）
   pendingEffect?: 'draw2' | 'draw4' | 'skip'; // 次プレイヤーへの効果
+  waitingForColorChoice?: boolean;          // ワイルド使用後の色選択待ち
+  colorChoicePlayerId?: string;             // 色選択するプレイヤーID
 }
 
 // ゲーム設定

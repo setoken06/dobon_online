@@ -56,6 +56,8 @@ export class GameManager {
   // UNOモード用
   private turnDirection: 1 | -1 = 1; // 1=時計回り, -1=反時計回り
   private pendingEffect?: 'draw2' | 'draw4' | 'skip'; // 次プレイヤーへの効果
+  private waitingForColorChoice: boolean = false; // ワイルド使用後の色選択待ち
+  private colorChoicePlayerId?: string; // 色選択するプレイヤーID
 
   constructor(roomId: string, players: Player[], jokerCount: number = 0, initialRate: number = 100, gameMode: GameMode = 'classic') {
     this.roomId = roomId;
@@ -307,20 +309,18 @@ export class GameManager {
 
   // UNOモードの上がり数字計算
   private calculateWinningNumbersUno(hand: Card[]): number[] {
-    // ワイルド4を持っている場合はドボンできない
-    if (hand.some(card => card.isWild4)) return [];
+    // ワイルド系（ワイルド・ワイルド4）を持っている場合はドボンできない
+    if (hand.some(card => isWildCard(card))) return [];
 
     const specialCards = this.getSpecialCards(hand);
     const numberCards = this.getNumberOnlyCards(hand);
-    const wildCards = hand.filter(card => isWildCard(card) && !card.isWild4);
 
     // 記号カードが2枚以上あるとリーチ不成立
     if (specialCards.length >= 2) return [];
 
     if (specialCards.length === 1) {
-      // 記号カード1枚：数字カード（+ワイルド）でリーチが成立している場合、記号カード単独待ち
-      // まず数字カード+ワイルドだけでリーチが成立するか確認
-      const nonSpecialHand = [...numberCards, ...wildCards];
+      // 記号カード1枚：数字カードのみでリーチが成立している場合、記号カード単独待ち
+      const nonSpecialHand = [...numberCards];
       if (this.checkReachConditionForCards(nonSpecialHand)) {
         // 記号カード単独の待ち（=場に同じ記号カードが出ればドボン）
         // 記号カードのドボンは「場のカードの数値」ではなくカードの種類マッチなので
@@ -333,7 +333,7 @@ export class GameManager {
       return [];
     }
 
-    // 記号カードなし：通常のドボン計算（ワイルドはジョーカー扱い）
+    // 記号カードなし：通常のドボン計算（数字カードのみ）
     if (numberCards.length === 0) return [];
 
     if (numberCards.length === 1) {
@@ -386,8 +386,8 @@ export class GameManager {
 
   // UNOモード用リーチチェック
   private checkReachConditionUno(hand: Card[]): boolean {
-    // ワイルド4を持っている場合はドボンできない
-    if (hand.some(card => card.isWild4)) return false;
+    // ワイルド系（ワイルド・ワイルド4）を持っている場合はドボンできない
+    if (hand.some(card => isWildCard(card))) return false;
 
     const specialCards = this.getSpecialCards(hand);
 
@@ -520,6 +520,8 @@ export class GameManager {
       // UNOモード用
       turnDirection: this.gameMode === 'uno' ? this.turnDirection : undefined,
       pendingEffect: this.pendingEffect,
+      waitingForColorChoice: this.waitingForColorChoice || undefined,
+      colorChoicePlayerId: this.colorChoicePlayerId,
     };
   }
 
@@ -530,7 +532,17 @@ export class GameManager {
 
     const topCard = this.getTopCard();
     const effectiveTopCard = this.getEffectiveTopCard();
-    return player.hand.filter(card => canPlayCard(card, topCard, effectiveTopCard));
+    const playable = player.hand.filter(card => canPlayCard(card, topCard, effectiveTopCard));
+
+    // UNOモード: ワイルド4は他に出せるカードがある場合は使用不可
+    if (this.gameMode === 'uno') {
+      const nonWild4Playable = playable.filter(card => !card.isWild4);
+      if (nonWild4Playable.length > 0) {
+        return nonWild4Playable;
+      }
+    }
+
+    return playable;
   }
 
   // 手札からジョーカー/ワイルドを取得
@@ -620,6 +632,10 @@ export class GameManager {
       return { success: false, error: '初期レートの確認を待っています' };
     }
 
+    if (this.waitingForColorChoice) {
+      return { success: false, error: '色選択を待っています' };
+    }
+
     const currentPlayer = this.getCurrentPlayer();
     if (currentPlayer.playerId !== playerId) {
       return { success: false, error: 'あなたのターンではありません' };
@@ -693,12 +709,28 @@ export class GameManager {
       currentPlayer.isReach = false;
     }
 
-    // UNOモード: カード効果を適用
+    // UNOモード: カード効果を適用（ドロー2/スキップ/リバース/ドロー4）
     const lastCard = cards[cards.length - 1];
     if (this.gameMode === 'uno') {
       this.applyUnoCardEffect(lastCard);
     }
 
+    // UNOモード: ワイルド系を出した場合、色選択待ちに入る
+    if (this.gameMode === 'uno' && isWildCard(lastCard)) {
+      this.waitingForColorChoice = true;
+      this.colorChoicePlayerId = playerId;
+      // 色選択後に後続処理（ドボンチェック・ターン進行）を行う
+      return { success: true };
+    }
+
+    // 色選択不要の場合は直接ドボンチェック・ターン進行
+    this.proceedAfterPlay(playerId, lastCard);
+
+    return { success: true };
+  }
+
+  // カード出し後の後続処理（ドボンチェック・ターン進行）
+  private proceedAfterPlay(playerId: string, lastCard: Card): void {
     // ドボン可能なプレイヤーをチェック
     this.dobonablePlayerIds.clear();
     this.playersWhoDoboned.clear();
@@ -707,7 +739,6 @@ export class GameManager {
     const cardValue = this.getCardValue(lastCard);
 
     if (this.gameMode === 'uno') {
-      // UNOモード: 記号カードはcheckDobonConditionForSpecialで判定
       if (isUnoSpecialCard(lastCard)) {
         for (const player of this.players) {
           if (player.playerId !== playerId && this.checkDobonConditionForSpecial(player.playerId, lastCard)) {
@@ -715,7 +746,6 @@ export class GameManager {
           }
         }
       } else if (!isWildCard(lastCard)) {
-        // 数字カード
         for (const player of this.players) {
           if (player.playerId !== playerId && this.checkDobonCondition(player.playerId, cardValue)) {
             this.dobonablePlayerIds.add(player.playerId);
@@ -724,7 +754,6 @@ export class GameManager {
       }
       // ワイルド系ではドボンチェックしない
     } else {
-      // クラシックモード
       if (!isJokerCard(lastCard)) {
         for (const player of this.players) {
           if (player.playerId !== playerId && this.checkDobonCondition(player.playerId, cardValue)) {
@@ -747,6 +776,36 @@ export class GameManager {
         this.applyPendingEffect();
       }
     }
+  }
+
+  // ワイルド使用後の色選択
+  chooseColor(playerId: string, color: UnoColor): { success: boolean; error?: string } {
+    if (!this.waitingForColorChoice) {
+      return { success: false, error: '色選択待ちではありません' };
+    }
+    if (this.colorChoicePlayerId !== playerId) {
+      return { success: false, error: 'あなたが色を選択するターンではありません' };
+    }
+
+    // 場の一番上のワイルドカードに色を設定
+    const topCard = this.getTopCard();
+    if (isWildCard(topCard)) {
+      topCard.chosenColor = color;
+    }
+
+    this.waitingForColorChoice = false;
+    const choicePlayerId = this.colorChoicePlayerId!;
+    this.colorChoicePlayerId = undefined;
+
+    // 後続処理（ドボンチェック・ターン進行）
+    // ワイルド系はドボンチェック不要なので直接ターン進行
+    this.dobonTriggerPlayerId = undefined;
+    this.dobonCardValue = undefined;
+    this.nextTurn();
+
+    if (this.pendingEffect) {
+      this.applyPendingEffect();
+    }
 
     return { success: true };
   }
@@ -763,6 +822,10 @@ export class GameManager {
 
     if (this.waitingForInitialRateConfirm) {
       return { success: false, error: '初期レートの確認を待っています' };
+    }
+
+    if (this.waitingForColorChoice) {
+      return { success: false, error: '色選択を待っています' };
     }
 
     const currentPlayer = this.getCurrentPlayer();

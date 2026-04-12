@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { GameState } from '../../types/game';
-import { canPlayCard } from '../../types/card';
+import { canPlayCard, UnoColor, UNO_COLORS } from '../../types/card';
 import { Hand } from './Hand';
 import { Deck } from './Deck';
 import { DiscardPile } from './DiscardPile';
@@ -25,6 +25,7 @@ interface GameBoardProps {
   onBackToLobby: () => void;
   onConfirmInitialRate: () => void;
   onAdvanceDobonPhase: () => void;
+  onChooseColor?: (color: UnoColor) => void;
 }
 
 export function GameBoard({
@@ -41,6 +42,7 @@ export function GameBoard({
   onBackToLobby,
   onConfirmInitialRate,
   onAdvanceDobonPhase,
+  onChooseColor,
 }: GameBoardProps) {
   const myPlayer = gameState.players.find((p) => p.playerId === playerId);
   const opponents = gameState.players.filter((p) => p.playerId !== playerId);
@@ -51,6 +53,26 @@ export function GameBoard({
     ? gameState.winners.some(w => w.playerId === playerId)
     : gameState.winnerId === playerId;
   const handCount = myPlayer?.hand?.length ?? 0;
+
+  // 文字演出（ドボン/ツモドボン/ドボン返し）
+  const [announcement, setAnnouncement] = useState<string | null>(null);
+  const [prevDobonPhase, setPrevDobonPhase] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    // dobonPhase が 'success' に変わった瞬間を検知
+    if (gameState.dobonPhase === 'success' && prevDobonPhase !== 'success') {
+      let text = 'ドボン！';
+      if (gameState.isDobonGaeshi) {
+        text = 'ドボン返し！';
+      } else if (gameState.loser?.isTsumoDobon) {
+        text = 'ツモドボン！';
+      }
+      setAnnouncement(text);
+      const timer = setTimeout(() => setAnnouncement(null), 2000);
+      return () => clearTimeout(timer);
+    }
+    setPrevDobonPhase(gameState.dobonPhase);
+  }, [gameState.dobonPhase, gameState.isDobonGaeshi, gameState.loser?.isTsumoDobon, prevDobonPhase]);
 
   // ドボン/ドボン返し待機中 or ドボン演出中はアクション不可
   const isWaitingForDobonAction = gameState.isWaitingForDobon || gameState.isWaitingForDobonGaeshi || !!gameState.dobonPhase;
@@ -153,8 +175,8 @@ export function GameBoard({
 
   return (
     <div className="min-h-screen bg-green-900 p-4 flex flex-col">
-      {/* 結果モーダル */}
-      {isFinished && gameState.winnerName && (
+      {/* 結果モーダル（ドボン演出を経由した場合はドボンリザルトフェーズで表示済みなので非表示） */}
+      {isFinished && gameState.winnerName && !gameState.winners && (
         <GameResult
           winnerName={gameState.winnerName}
           isWinner={isWinner}
@@ -235,6 +257,46 @@ export function GameBoard({
         </div>
       )}
 
+      {/* ワイルド使用後の色選択オーバーレイ */}
+      {gameState.waitingForColorChoice && gameState.colorChoicePlayerId === playerId && onChooseColor && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl text-center">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">色を選択</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {UNO_COLORS.map((color) => {
+                const colorStyles: Record<string, string> = {
+                  red: 'bg-red-500 hover:bg-red-600',
+                  blue: 'bg-blue-500 hover:bg-blue-600',
+                  yellow: 'bg-yellow-400 hover:bg-yellow-500 text-gray-900',
+                  green: 'bg-green-500 hover:bg-green-600',
+                };
+                const colorLabels: Record<string, string> = {
+                  red: '赤', blue: '青', yellow: '黄', green: '緑',
+                };
+                return (
+                  <button
+                    key={color}
+                    onClick={() => onChooseColor(color)}
+                    className={`w-24 h-24 rounded-xl text-white text-2xl font-bold transition transform hover:scale-110 ${colorStyles[color]}`}
+                  >
+                    {colorLabels[color]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 他プレイヤーの色選択待ち表示 */}
+      {gameState.waitingForColorChoice && gameState.colorChoicePlayerId !== playerId && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-30">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl text-center">
+            <p className="text-gray-800 text-lg font-semibold">色を選択中...</p>
+          </div>
+        </div>
+      )}
+
       {/* ドボン可能時のオーバーレイ */}
       {gameState.canDobon && !isFinished && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
@@ -294,6 +356,30 @@ export function GameBoard({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 文字演出オーバーレイ */}
+      {announcement && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div className="animate-bounce">
+            <h1
+              className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_0_30px_rgba(255,0,0,0.8)]"
+              style={{
+                textShadow: '0 0 20px rgba(255,50,50,0.9), 0 0 60px rgba(255,0,0,0.5), 0 4px 8px rgba(0,0,0,0.5)',
+                animation: 'announcePulse 0.5s ease-in-out',
+              }}
+            >
+              {announcement}
+            </h1>
+          </div>
+          <style>{`
+            @keyframes announcePulse {
+              0% { transform: scale(0.3); opacity: 0; }
+              50% { transform: scale(1.2); opacity: 1; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+          `}</style>
         </div>
       )}
 
@@ -390,7 +476,7 @@ export function GameBoard({
         <GameResult
           winnerName={gameState.winners[0]?.playerName || ''}
           isWinner={gameState.winners.some(w => w.playerId === playerId)}
-          onBackToLobby={onAdvanceDobonPhase}
+          onBackToLobby={() => { onAdvanceDobonPhase(); setTimeout(onBackToLobby, 300); }}
           lastDrawCards={gameState.lastDrawCards}
           finalScore={gameState.finalScore}
           winnerHandCount={gameState.winnerHandCount}

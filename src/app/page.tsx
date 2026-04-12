@@ -32,6 +32,7 @@ export default function Home() {
     backToLobby,
     confirmInitialRate,
     advanceDobonPhase,
+    chooseColor,
     clearError,
   } = useSocket();
 
@@ -115,6 +116,7 @@ export default function Home() {
           onBackToLobby={backToLobby}
           onConfirmInitialRate={confirmInitialRate}
           onAdvanceDobonPhase={advanceDobonPhase}
+          onChooseColor={chooseColor}
         />
       </>
     );

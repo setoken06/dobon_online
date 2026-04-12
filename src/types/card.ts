@@ -21,6 +21,7 @@ export interface Card {
   isJoker?: boolean; // ジョーカーフラグ（クラシック: ジョーカー、UNO: ワイルド）
   unoSpecial?: UnoSpecialType; // UNO記号カード種別
   isWild4?: boolean; // ワイルドドロー4フラグ
+  chosenColor?: UnoColor; // ワイルド使用時に指定された色
 }
 
 // 全てのマーク
@@ -103,8 +104,13 @@ export function canPlayCard(card: Card, topCard: Card, effectiveTopCard?: Card):
     return true;
   }
 
-  // 場のカードがワイルドの場合、なんでも出せる
+  // 場のカードがワイルドの場合
   if (isWildCard(topCard)) {
+    // 色が指定されていれば、その色にマッチするカードのみ出せる
+    if (topCard.chosenColor) {
+      return card.suit === topCard.chosenColor;
+    }
+    // 色未指定なら何でも出せる
     return true;
   }
 

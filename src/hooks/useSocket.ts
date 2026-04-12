@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { getSocket, connectSocket, disconnectSocket, TypedSocket } from '../lib/socket';
 import { Room, Player } from '../types/room';
 import { GameState } from '../types/game';
-import { Suit, GameMode } from '../types/card';
+import { Suit, GameMode, UnoColor } from '../types/card';
 
 // セッション管理用のlocalStorageキー
 const SESSION_KEYS = {
@@ -87,6 +87,7 @@ interface UseSocketReturn {
   backToLobby: () => void;
   confirmInitialRate: () => void;
   advanceDobonPhase: () => void;
+  chooseColor: (color: UnoColor) => void;
   clearError: () => void;
 }
 
@@ -388,6 +389,12 @@ export function useSocket(): UseSocketReturn {
     }
   }, [socket, room]);
 
+  const chooseColor = useCallback((color: UnoColor) => {
+    if (room) {
+      socket?.emit('game:chooseColor', { roomId: room.id, color });
+    }
+  }, [socket, room]);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -419,6 +426,7 @@ export function useSocket(): UseSocketReturn {
     backToLobby,
     confirmInitialRate,
     advanceDobonPhase,
+    chooseColor,
     clearError,
   };
 }

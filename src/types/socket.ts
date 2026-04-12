@@ -1,4 +1,4 @@
-import { Card, Suit, GameMode } from './card';
+import { Card, Suit, GameMode, UnoColor } from './card';
 import { Room, Player } from './room';
 import { GameState } from './game';
 
@@ -19,6 +19,7 @@ export interface ClientToServerEvents {
   'game:backToLobby': (data: { roomId: string }) => void;
   'game:confirmInitialRate': (data: { roomId: string }) => void;
   'game:advanceDobonPhase': (data: { roomId: string }) => void;
+  'game:chooseColor': (data: { roomId: string; color: UnoColor }) => void;
 }
 
 // サーバー → クライアント
