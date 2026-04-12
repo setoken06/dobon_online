@@ -66,8 +66,9 @@ export interface GameState {
   waitingForInitialRateConfirm?: boolean;   // 初期レート確認待ち
   initialRateConfirmPlayerId?: string;      // 確認するプレイヤーID
   // ドボン待機関連
-  isWaitingForDobon?: boolean;              // 誰かがドボン選択中
-  isWaitingForDobonGaeshi?: boolean;        // 誰かがドボン返し選択中
+  isWaitingForDobon?: boolean;              // 自分がドボン選択可能
+  isWaitingForDobonGaeshi?: boolean;        // 自分がドボン返し選択可能
+  isAnyoneDecidingDobon?: boolean;          // 誰かがドボン/ドボン返し判定中（全員共通）
   // ドボン演出フェーズ
   dobonPhase?: 'success' | 'lastDraw' | 'result';
   dobonWinnerPlayerIds?: string[];          // フェーズ進行ボタンを押せるプレイヤー

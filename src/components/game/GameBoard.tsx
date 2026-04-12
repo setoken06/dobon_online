@@ -75,7 +75,7 @@ export function GameBoard({
   }, [gameState.dobonPhase, gameState.isDobonGaeshi, gameState.loser?.isTsumoDobon, prevDobonPhase]);
 
   // ドボン/ドボン返し待機中 or ドボン演出中はアクション不可
-  const isWaitingForDobonAction = gameState.isWaitingForDobon || gameState.isWaitingForDobonGaeshi || !!gameState.dobonPhase;
+  const isWaitingForDobonAction = gameState.isWaitingForDobon || gameState.isWaitingForDobonGaeshi || !!gameState.dobonPhase || !!gameState.isAnyoneDecidingDobon;
   const canDraw = isMyTurn && !gameState.hasDrawnThisTurn && !isWaitingForDobonAction;
 
   // 選択中のカードID
@@ -383,8 +383,8 @@ export function GameBoard({
         </div>
       )}
 
-      {/* ドボン成功フェーズ */}
-      {gameState.dobonPhase === 'success' && !isFinished && (
+      {/* ドボン成功フェーズ（文字演出中は非表示） */}
+      {gameState.dobonPhase === 'success' && !isFinished && !announcement && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
           <div className={`rounded-2xl p-6 md:p-8 shadow-2xl text-center max-w-lg mx-4 ${
             gameState.isDobonGaeshi

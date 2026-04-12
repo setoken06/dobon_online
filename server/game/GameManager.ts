@@ -513,6 +513,7 @@ export class GameManager {
       initialRateConfirmPlayerId: this.waitingForInitialRateConfirm ? this.getCurrentPlayer().playerId : undefined,
       isWaitingForDobon: this.dobonablePlayerIds.has(playerId),
       isWaitingForDobonGaeshi: this.dobonGaeshiEligiblePlayerIds.has(playerId),
+      isAnyoneDecidingDobon: this.dobonablePlayerIds.size > 0 || this.dobonGaeshiEligiblePlayerIds.size > 0,
       dobonPhase: this.dobonPhase,
       dobonWinnerPlayerIds,
       isDobonGaeshi: this.dobonPhase ? this.pendingDobonIsGaeshi : undefined,
