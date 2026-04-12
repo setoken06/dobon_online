@@ -814,7 +814,11 @@ export class GameManager {
   }
 
   // ラストドローカードを1枚公開（勝者のみ操作可能）
-  revealLastDrawCard(playerId: string): { success: boolean; error?: string; allRevealed?: boolean } {
+  // revealedLastDrawCount の意味:
+  // 偶数(0,2,4,...): 次のカードをめくれる状態
+  // 奇数(1,3,5,...): 最新カードを確認待ち状態
+  // lastDrawCards.length * 2: 全カード公開+確認完了
+  revealLastDrawCard(playerId: string): { success: boolean; error?: string } {
     if (this.dobonPhase !== 'result') {
       return { success: false, error: 'リザルトフェーズではありません' };
     }
@@ -822,13 +826,12 @@ export class GameManager {
     if (!isWinner) {
       return { success: false, error: 'ドボン成功者のみ操作できます' };
     }
-    if (this.revealedLastDrawCount >= this.lastDrawCards.length) {
-      return { success: false, error: '全カード公開済みです' };
+    if (this.revealedLastDrawCount >= this.lastDrawCards.length * 2) {
+      return { success: false, error: '既に完了しています' };
     }
 
     this.revealedLastDrawCount++;
-    const allRevealed = this.revealedLastDrawCount >= this.lastDrawCards.length;
-    return { success: true, allRevealed };
+    return { success: true };
   }
 
   // カードを引く

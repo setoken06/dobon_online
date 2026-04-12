@@ -99,19 +99,23 @@ export function GameBoard({
     }
   }, [gameState.dobonPhase, gameState.lastDrawCards, gameState.revealedLastDrawCount]);
 
-  // カード公開数が変わったら演出テキスト表示
+  // カード公開時（奇数ステップ）に演出テキスト表示
   useEffect(() => {
     const count = gameState.revealedLastDrawCount || 0;
-    if (count > prevRevealedCount && gameState.lastDrawCards && count <= gameState.lastDrawCards.length) {
-      const card = gameState.lastDrawCards[count - 1];
-      const isWild = card.suit === 'wild' || card.suit === 'joker';
-      if (isWild) {
-        setLastDrawAnnouncement('×2！\nもう一枚！');
-      } else {
-        const value = card.unoSpecial ? 10 : card.rank;
-        setLastDrawAnnouncement(`×${value}！`);
+    if (count > prevRevealedCount && gameState.lastDrawCards && count % 2 === 1) {
+      // 奇数 = カード公開直後
+      const cardIndex = Math.floor(count / 2);
+      if (cardIndex < gameState.lastDrawCards.length) {
+        const card = gameState.lastDrawCards[cardIndex];
+        const isWild = card.suit === 'wild' || card.suit === 'joker';
+        if (isWild) {
+          setLastDrawAnnouncement('×2！\nもう一枚！');
+        } else {
+          const value = card.unoSpecial ? 10 : card.rank;
+          setLastDrawAnnouncement(`×${value}！`);
+        }
+        setTimeout(() => setLastDrawAnnouncement(null), 1500);
       }
-      setTimeout(() => setLastDrawAnnouncement(null), 1500);
     }
     setPrevRevealedCount(count);
   }, [gameState.revealedLastDrawCount, gameState.lastDrawCards, prevRevealedCount]);
@@ -125,9 +129,9 @@ export function GameBoard({
 
   const isWinnerPlayer = gameState.dobonWinnerPlayerIds?.includes(playerId);
   const revealedCount = gameState.revealedLastDrawCount || 0;
-  // 勝者: confirmedCountで管理、非勝者: 全カード公開されたら自動的に完了
+  // revealedCount >= totalCards * 2 = 全カード公開+確認完了（リザルト表示可能）
   const allCardsConfirmed = gameState.lastDrawCards
-    ? (isWinnerPlayer ? confirmedCount >= gameState.lastDrawCards.length : revealedCount >= gameState.lastDrawCards.length)
+    ? revealedCount >= gameState.lastDrawCards.length * 2
     : false;
 
   // ドボン/ドボン返し待機中 or ドボン演出中はアクション不可
@@ -525,34 +529,37 @@ export function GameBoard({
             <h2 className="text-3xl font-bold text-white mb-6">ラストドロー</h2>
             <div className="flex justify-center gap-6 flex-wrap mb-6">
               {gameState.lastDrawCards.map((card, index) => {
-                const isRevealed = index < revealedCount;
-                const isConfirmed = index < confirmedCount;
-                // 次にめくれるカード: 全確認済み かつ このカードが次の未公開
-                const canReveal = isWinnerPlayer && confirmedCount >= revealedCount && index === revealedCount;
-                // 確認待ち: 公開済みだが未確認（最新の公開カード）
-                const canConfirm = isWinnerPlayer && isRevealed && !isConfirmed && index === revealedCount - 1;
+                const totalCards = gameState.lastDrawCards!.length;
+                // revealedCount: 0=未開始, 1=1枚目表示中, 2=1枚目確認済み, 3=2枚目表示中...
+                // 偶数(0,2,4,...) = 次のカードをめくれる状態
+                // 奇数(1,3,5,...) = 最新カードを確認待ち
+                const cardRevealed = revealedCount >= index * 2 + 1; // このカードが表示されているか
+                const cardConfirmed = revealedCount >= index * 2 + 2; // このカードが確認済みか
+                const isLatestRevealed = cardRevealed && !cardConfirmed;
+                // めくれる: 偶数ステップ かつ このカードが次
+                const canRevealThis = isWinnerPlayer && revealedCount === index * 2;
+                // 確認: 奇数ステップ かつ このカードが最新
+                const canConfirmThis = isWinnerPlayer && isLatestRevealed;
 
                 return (
                   <div key={index}
-                    className={canReveal || canConfirm ? 'cursor-pointer' : ''}
+                    className={canRevealThis || canConfirmThis ? 'cursor-pointer' : ''}
                     onClick={() => {
-                      if (canReveal) {
+                      if (canRevealThis || canConfirmThis) {
                         onRevealLastDrawCard?.();
-                      } else if (canConfirm) {
-                        setConfirmedCount(prev => prev + 1);
                       }
                     }}
                   >
-                    {isRevealed ? (
-                      <div className={isConfirmed ? '' : 'animate-bounce'}>
+                    {cardRevealed ? (
+                      <div className={cardConfirmed ? '' : 'animate-bounce'}>
                         <Card card={card} size="xl" />
-                        {canConfirm && (
+                        {canConfirmThis && (
                           <p className="text-white/70 text-xs mt-1 animate-pulse">タップで次へ</p>
                         )}
                       </div>
                     ) : (
                       <div className={`w-40 h-56 bg-blue-800 rounded-xl border-2 border-blue-900 shadow-lg flex items-center justify-center ${
-                        canReveal ? 'animate-pulse hover:border-yellow-400 cursor-pointer' : 'opacity-50'
+                        canRevealThis ? 'animate-pulse hover:border-yellow-400 cursor-pointer' : 'opacity-50'
                       }`}>
                         <div className="w-3/4 h-3/4 bg-blue-700 rounded-lg border border-blue-600 flex items-center justify-center">
                           <span className="text-blue-400 text-4xl">?</span>
