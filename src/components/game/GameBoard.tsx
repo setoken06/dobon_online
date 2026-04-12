@@ -88,12 +88,14 @@ export function GameBoard({
   // ラストドロー演出（サーバー同期）
   const [lastDrawAnnouncement, setLastDrawAnnouncement] = useState<string | null>(null);
   const [prevRevealedCount, setPrevRevealedCount] = useState(0);
+  const [confirmedCount, setConfirmedCount] = useState(0); // 表側カードをタップして確認済みの枚数
   const [resultDismissed, setResultDismissed] = useState(false);
 
   // revealedLastDrawCount が 0 でリセットされた = ラストドロー開始
   useEffect(() => {
     if (gameState.dobonPhase === 'result' && gameState.lastDrawCards && gameState.lastDrawCards.length > 0 && gameState.revealedLastDrawCount === 0) {
       setPrevRevealedCount(0);
+      setConfirmedCount(0);
     }
   }, [gameState.dobonPhase, gameState.lastDrawCards, gameState.revealedLastDrawCount]);
 
@@ -123,7 +125,7 @@ export function GameBoard({
 
   const isWinnerPlayer = gameState.dobonWinnerPlayerIds?.includes(playerId);
   const revealedCount = gameState.revealedLastDrawCount || 0;
-  const allCardsRevealed = gameState.lastDrawCards ? revealedCount >= gameState.lastDrawCards.length : false;
+  const allCardsConfirmed = gameState.lastDrawCards ? confirmedCount >= gameState.lastDrawCards.length : false;
 
   // ドボン/ドボン返し待機中 or ドボン演出中はアクション不可
   const isWaitingForDobonAction = gameState.isWaitingForDobon || gameState.isWaitingForDobonGaeshi || !!gameState.dobonPhase || !!gameState.isAnyoneDecidingDobon;
@@ -502,31 +504,49 @@ export function GameBoard({
       )}
 
       {/* ラストドロー演出（カードめくり・サーバー同期） */}
-      {gameState.dobonPhase === 'result' && gameState.lastDrawCards && !allCardsRevealed && (
+      {gameState.dobonPhase === 'result' && gameState.lastDrawCards && !allCardsConfirmed && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-40">
           <div className="text-center">
             <h2 className="text-3xl font-bold text-white mb-6">ラストドロー</h2>
             <div className="flex justify-center gap-6 flex-wrap mb-6">
-              {gameState.lastDrawCards.map((card, index) => (
-                <div key={index}
-                  className={isWinnerPlayer && index === revealedCount ? 'cursor-pointer' : ''}
-                  onClick={() => isWinnerPlayer && index === revealedCount && onRevealLastDrawCard?.()}
-                >
-                  {index < revealedCount ? (
-                    <div className="animate-bounce">
-                      <Card card={card} size="lg" disabled />
-                    </div>
-                  ) : (
-                    <div className={`w-24 h-36 bg-blue-800 rounded-xl border-2 border-blue-900 shadow-lg flex items-center justify-center ${
-                      isWinnerPlayer && index === revealedCount ? 'animate-pulse hover:border-yellow-400 cursor-pointer' : 'opacity-50'
-                    }`}>
-                      <div className="w-3/4 h-3/4 bg-blue-700 rounded-lg border border-blue-600 flex items-center justify-center">
-                        <span className="text-blue-400 text-4xl">?</span>
+              {gameState.lastDrawCards.map((card, index) => {
+                const isRevealed = index < revealedCount;
+                const isConfirmed = index < confirmedCount;
+                // 次にめくれるカード: 全確認済み かつ このカードが次の未公開
+                const canReveal = isWinnerPlayer && confirmedCount >= revealedCount && index === revealedCount;
+                // 確認待ち: 公開済みだが未確認（最新の公開カード）
+                const canConfirm = isWinnerPlayer && isRevealed && !isConfirmed && index === revealedCount - 1;
+
+                return (
+                  <div key={index}
+                    className={canReveal || canConfirm ? 'cursor-pointer' : ''}
+                    onClick={() => {
+                      if (canReveal) {
+                        onRevealLastDrawCard?.();
+                      } else if (canConfirm) {
+                        setConfirmedCount(prev => prev + 1);
+                      }
+                    }}
+                  >
+                    {isRevealed ? (
+                      <div className={isConfirmed ? '' : 'animate-bounce'}>
+                        <Card card={card} size="lg" disabled />
+                        {canConfirm && (
+                          <p className="text-white/70 text-xs mt-1 animate-pulse">タップで次へ</p>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      <div className={`w-24 h-36 bg-blue-800 rounded-xl border-2 border-blue-900 shadow-lg flex items-center justify-center ${
+                        canReveal ? 'animate-pulse hover:border-yellow-400 cursor-pointer' : 'opacity-50'
+                      }`}>
+                        <div className="w-3/4 h-3/4 bg-blue-700 rounded-lg border border-blue-600 flex items-center justify-center">
+                          <span className="text-blue-400 text-4xl">?</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             {/* めくり演出テキスト */}
             {lastDrawAnnouncement && (
@@ -549,8 +569,8 @@ export function GameBoard({
         </div>
       )}
 
-      {/* ドボンリザルトフェーズ（全カード公開後） */}
-      {gameState.dobonPhase === 'result' && gameState.winners && allCardsRevealed && !resultDismissed && (
+      {/* ドボンリザルトフェーズ（全カード確認後） */}
+      {gameState.dobonPhase === 'result' && gameState.winners && allCardsConfirmed && !resultDismissed && (
         <GameResult
           winnerName={gameState.winners[0]?.playerName || ''}
           isWinner={gameState.winners.some(w => w.playerId === playerId)}
