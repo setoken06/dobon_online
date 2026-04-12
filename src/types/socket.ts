@@ -20,6 +20,7 @@ export interface ClientToServerEvents {
   'game:confirmInitialRate': (data: { roomId: string }) => void;
   'game:advanceDobonPhase': (data: { roomId: string }) => void;
   'game:chooseColor': (data: { roomId: string; color: UnoColor }) => void;
+  'game:revealLastDrawCard': (data: { roomId: string }) => void;
 }
 
 // サーバー → クライアント

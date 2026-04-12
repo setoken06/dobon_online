@@ -79,6 +79,7 @@ export interface GameState {
   pendingEffect?: 'draw2' | 'draw4' | 'skip'; // 次プレイヤーへの効果
   waitingForColorChoice?: boolean;          // ワイルド使用後の色選択待ち
   colorChoicePlayerId?: string;             // 色選択するプレイヤーID
+  revealedLastDrawCount?: number;           // ラストドローで公開済みのカード数
 }
 
 // ゲーム設定

@@ -56,8 +56,9 @@ export class GameManager {
   // UNOモード用
   private turnDirection: 1 | -1 = 1; // 1=時計回り, -1=反時計回り
   private pendingEffect?: 'draw2' | 'draw4' | 'skip'; // 次プレイヤーへの効果
-  private waitingForColorChoice: boolean = false; // ワイルド使用後の色選択待ち
-  private colorChoicePlayerId?: string; // 色選択するプレイヤーID
+  private waitingForColorChoice: boolean = false;
+  private colorChoicePlayerId?: string;
+  private revealedLastDrawCount: number = 0; // ラストドローで公開済みカード数
 
   constructor(roomId: string, players: Player[], jokerCount: number = 0, initialRate: number = 100, gameMode: GameMode = 'classic') {
     this.roomId = roomId;
@@ -523,6 +524,7 @@ export class GameManager {
       pendingEffect: this.pendingEffect,
       waitingForColorChoice: this.waitingForColorChoice || undefined,
       colorChoicePlayerId: this.colorChoicePlayerId,
+      revealedLastDrawCount: this.dobonPhase === 'result' ? this.revealedLastDrawCount : undefined,
     };
   }
 
@@ -811,6 +813,24 @@ export class GameManager {
     return { success: true };
   }
 
+  // ラストドローカードを1枚公開（勝者のみ操作可能）
+  revealLastDrawCard(playerId: string): { success: boolean; error?: string; allRevealed?: boolean } {
+    if (this.dobonPhase !== 'result') {
+      return { success: false, error: 'リザルトフェーズではありません' };
+    }
+    const isWinner = this.pendingDobonWinners.some(w => w.playerId === playerId);
+    if (!isWinner) {
+      return { success: false, error: 'ドボン成功者のみ操作できます' };
+    }
+    if (this.revealedLastDrawCount >= this.lastDrawCards.length) {
+      return { success: false, error: '全カード公開済みです' };
+    }
+
+    this.revealedLastDrawCount++;
+    const allRevealed = this.revealedLastDrawCount >= this.lastDrawCards.length;
+    return { success: true, allRevealed };
+  }
+
   // カードを引く
   drawCard(playerId: string): { success: boolean; card?: Card; error?: string; mustDrawAgain?: boolean; mustPlayJoker?: boolean } {
     if (this.dobonPhase) {
@@ -1067,6 +1087,7 @@ export class GameManager {
       this.performLastDraw();
       this.calculateFinalScores();
       this.dobonPhase = 'result';
+      this.revealedLastDrawCount = 0; // カードめくりカウントをリセット
       return { success: true };
     }
 

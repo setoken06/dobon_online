@@ -33,6 +33,7 @@ export default function Home() {
     confirmInitialRate,
     advanceDobonPhase,
     chooseColor,
+    revealLastDrawCard,
     clearError,
   } = useSocket();
 
@@ -117,6 +118,7 @@ export default function Home() {
           onConfirmInitialRate={confirmInitialRate}
           onAdvanceDobonPhase={advanceDobonPhase}
           onChooseColor={chooseColor}
+          onRevealLastDrawCard={revealLastDrawCard}
         />
       </>
     );

@@ -88,6 +88,7 @@ interface UseSocketReturn {
   confirmInitialRate: () => void;
   advanceDobonPhase: () => void;
   chooseColor: (color: UnoColor) => void;
+  revealLastDrawCard: () => void;
   clearError: () => void;
 }
 
@@ -395,6 +396,12 @@ export function useSocket(): UseSocketReturn {
     }
   }, [socket, room]);
 
+  const revealLastDrawCard = useCallback(() => {
+    if (room) {
+      socket?.emit('game:revealLastDrawCard', { roomId: room.id });
+    }
+  }, [socket, room]);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -427,6 +434,7 @@ export function useSocket(): UseSocketReturn {
     confirmInitialRate,
     advanceDobonPhase,
     chooseColor,
+    revealLastDrawCard,
     clearError,
   };
 }

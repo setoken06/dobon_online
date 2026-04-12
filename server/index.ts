@@ -479,6 +479,29 @@ app.prepare().then(() => {
       }
     });
 
+    // ラストドローカード公開
+    socket.on('game:revealLastDrawCard', ({ roomId }) => {
+      try {
+        const game = roomStore.getGame(roomId);
+        if (!game) {
+          socket.emit('game:error', { message: 'ゲームが見つかりません' });
+          return;
+        }
+
+        const result = game.revealLastDrawCard(socket.id);
+        if (!result.success) {
+          socket.emit('game:error', { message: result.error || 'カードを公開できませんでした' });
+          return;
+        }
+
+        broadcastGameState(io, roomId, game);
+      } catch (error) {
+        socket.emit('game:error', {
+          message: error instanceof Error ? error.message : 'エラーが発生しました'
+        });
+      }
+    });
+
     // ワイルド使用後の色選択
     socket.on('game:chooseColor', ({ roomId, color }) => {
       try {
