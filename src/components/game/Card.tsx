@@ -8,7 +8,7 @@ interface CardProps {
   disabled?: boolean;
   selected?: boolean;
   playable?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 const UNO_COLOR_CLASSES: Record<UnoColor, { bg: string; border: string; text: string }> = {
@@ -36,6 +36,7 @@ export function Card({
     sm: 'w-12 h-16 text-sm',
     md: 'w-16 h-24 text-lg',
     lg: 'w-20 h-28 text-xl',
+    xl: 'w-32 h-48 text-3xl',
   };
 
   // ワイルドカード（UNOモード）
@@ -136,7 +137,7 @@ export function Card({
 }
 
 interface CardBackProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export function CardBack({ size = 'md' }: CardBackProps) {
@@ -144,6 +145,7 @@ export function CardBack({ size = 'md' }: CardBackProps) {
     sm: 'w-12 h-16',
     md: 'w-16 h-24',
     lg: 'w-20 h-28',
+    xl: 'w-32 h-48',
   };
 
   return (

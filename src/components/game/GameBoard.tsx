@@ -530,13 +530,13 @@ export function GameBoard({
                   >
                     {isRevealed ? (
                       <div className={isConfirmed ? '' : 'animate-bounce'}>
-                        <Card card={card} size="lg" disabled />
+                        <Card card={card} size="xl" disabled />
                         {canConfirm && (
                           <p className="text-white/70 text-xs mt-1 animate-pulse">タップで次へ</p>
                         )}
                       </div>
                     ) : (
-                      <div className={`w-24 h-36 bg-blue-800 rounded-xl border-2 border-blue-900 shadow-lg flex items-center justify-center ${
+                      <div className={`w-32 h-48 bg-blue-800 rounded-xl border-2 border-blue-900 shadow-lg flex items-center justify-center ${
                         canReveal ? 'animate-pulse hover:border-yellow-400 cursor-pointer' : 'opacity-50'
                       }`}>
                         <div className="w-3/4 h-3/4 bg-blue-700 rounded-lg border border-blue-600 flex items-center justify-center">
