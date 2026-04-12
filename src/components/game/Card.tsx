@@ -36,7 +36,7 @@ export function Card({
     sm: 'w-12 h-16 text-sm',
     md: 'w-16 h-24 text-lg',
     lg: 'w-20 h-28 text-xl',
-    xl: 'w-32 h-48 text-3xl',
+    xl: 'w-40 h-56 text-4xl',
   };
 
   // ワイルドカード（UNOモード）
@@ -145,7 +145,7 @@ export function CardBack({ size = 'md' }: CardBackProps) {
     sm: 'w-12 h-16',
     md: 'w-16 h-24',
     lg: 'w-20 h-28',
-    xl: 'w-32 h-48',
+    xl: 'w-40 h-56',
   };
 
   return (

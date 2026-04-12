@@ -125,7 +125,10 @@ export function GameBoard({
 
   const isWinnerPlayer = gameState.dobonWinnerPlayerIds?.includes(playerId);
   const revealedCount = gameState.revealedLastDrawCount || 0;
-  const allCardsConfirmed = gameState.lastDrawCards ? confirmedCount >= gameState.lastDrawCards.length : false;
+  // 勝者: confirmedCountで管理、非勝者: 全カード公開されたら自動的に完了
+  const allCardsConfirmed = gameState.lastDrawCards
+    ? (isWinnerPlayer ? confirmedCount >= gameState.lastDrawCards.length : revealedCount >= gameState.lastDrawCards.length)
+    : false;
 
   // ドボン/ドボン返し待機中 or ドボン演出中はアクション不可
   const isWaitingForDobonAction = gameState.isWaitingForDobon || gameState.isWaitingForDobonGaeshi || !!gameState.dobonPhase || !!gameState.isAnyoneDecidingDobon;
@@ -530,13 +533,13 @@ export function GameBoard({
                   >
                     {isRevealed ? (
                       <div className={isConfirmed ? '' : 'animate-bounce'}>
-                        <Card card={card} size="xl" disabled />
+                        <Card card={card} size="xl" />
                         {canConfirm && (
                           <p className="text-white/70 text-xs mt-1 animate-pulse">タップで次へ</p>
                         )}
                       </div>
                     ) : (
-                      <div className={`w-32 h-48 bg-blue-800 rounded-xl border-2 border-blue-900 shadow-lg flex items-center justify-center ${
+                      <div className={`w-40 h-56 bg-blue-800 rounded-xl border-2 border-blue-900 shadow-lg flex items-center justify-center ${
                         canReveal ? 'animate-pulse hover:border-yellow-400 cursor-pointer' : 'opacity-50'
                       }`}>
                         <div className="w-3/4 h-3/4 bg-blue-700 rounded-lg border border-blue-600 flex items-center justify-center">
