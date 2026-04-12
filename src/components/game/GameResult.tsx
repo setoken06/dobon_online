@@ -7,6 +7,7 @@ import { Card } from './Card';
 interface GameResultProps {
   winnerName: string;
   isWinner: boolean;
+  isHost?: boolean;
   onBackToLobby: () => void;
   lastDrawCards?: CardType[];
   finalScore?: number;
@@ -23,6 +24,7 @@ interface GameResultProps {
 export function GameResult({
   winnerName,
   isWinner,
+  isHost = false,
   onBackToLobby,
   lastDrawCards,
   finalScore,
@@ -171,12 +173,16 @@ export function GameResult({
           )
         )}
 
-        <button
-          onClick={onBackToLobby}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
-        >
-          待機画面に戻る
-        </button>
+        {isHost ? (
+          <button
+            onClick={onBackToLobby}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
+          >
+            待機画面に戻る
+          </button>
+        ) : (
+          <p className="text-gray-400 text-sm">ホストが待機画面に戻るのを待っています...</p>
+        )}
       </div>
     </div>
   );

@@ -106,6 +106,7 @@ export default function Home() {
         <GameBoard
           gameState={gameState}
           playerId={playerId}
+          isHost={room?.hostId === playerId}
           disconnectedPlayers={disconnectedPlayers}
           onPlayCards={playCards}
           onDrawCard={drawCard}

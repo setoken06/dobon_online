@@ -14,6 +14,7 @@ import { SUIT_SYMBOLS } from '../../types/card';
 interface GameBoardProps {
   gameState: GameState;
   playerId: string;
+  isHost?: boolean;
   disconnectedPlayers: Map<string, string>;
   onPlayCards: (cardIds: string[]) => void;
   onDrawCard: () => void;
@@ -32,6 +33,7 @@ interface GameBoardProps {
 export function GameBoard({
   gameState,
   playerId,
+  isHost = false,
   disconnectedPlayers,
   onPlayCards,
   onDrawCard,
@@ -102,7 +104,7 @@ export function GameBoard({
       const card = gameState.lastDrawCards[count - 1];
       const isWild = card.suit === 'wild' || card.suit === 'joker';
       if (isWild) {
-        setLastDrawAnnouncement('×2！');
+        setLastDrawAnnouncement('×2！\nもう一枚！');
       } else {
         const value = card.unoSpecial ? 10 : card.rank;
         setLastDrawAnnouncement(`×${value}！`);
@@ -241,6 +243,7 @@ export function GameBoard({
         <GameResult
           winnerName={gameState.winnerName}
           isWinner={isWinner}
+          isHost={isHost}
           onBackToLobby={onBackToLobby}
           lastDrawCards={gameState.lastDrawCards}
           finalScore={gameState.finalScore}
@@ -528,10 +531,12 @@ export function GameBoard({
             {/* めくり演出テキスト */}
             {lastDrawAnnouncement && (
               <div className="animate-bounce">
-                <span className="text-5xl font-black text-yellow-300 drop-shadow-[0_0_20px_rgba(255,200,0,0.8)]"
-                  style={{ textShadow: '0 0 20px rgba(255,200,0,0.9), 0 4px 8px rgba(0,0,0,0.5)' }}>
-                  {lastDrawAnnouncement}
-                </span>
+                {lastDrawAnnouncement.split('\n').map((line, i) => (
+                  <span key={i} className="block text-5xl font-black text-yellow-300 drop-shadow-[0_0_20px_rgba(255,200,0,0.8)]"
+                    style={{ textShadow: '0 0 20px rgba(255,200,0,0.9), 0 4px 8px rgba(0,0,0,0.5)' }}>
+                    {line}
+                  </span>
+                ))}
               </div>
             )}
             {!lastDrawAnnouncement && revealedCount === 0 && isWinnerPlayer && (
@@ -549,6 +554,7 @@ export function GameBoard({
         <GameResult
           winnerName={gameState.winners[0]?.playerName || ''}
           isWinner={gameState.winners.some(w => w.playerId === playerId)}
+          isHost={isHost}
           onBackToLobby={() => { setResultDismissed(true); onAdvanceDobonPhase(); setTimeout(onBackToLobby, 300); }}
           lastDrawCards={gameState.lastDrawCards}
           finalScore={gameState.finalScore}
