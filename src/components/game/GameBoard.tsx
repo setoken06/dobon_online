@@ -88,6 +88,13 @@ export function GameBoard({
   const [prevRevealedCount, setPrevRevealedCount] = useState(0);
   const [resultDismissed, setResultDismissed] = useState(false);
 
+  // revealedLastDrawCount が 0 でリセットされた = ラストドロー開始
+  useEffect(() => {
+    if (gameState.dobonPhase === 'result' && gameState.lastDrawCards && gameState.lastDrawCards.length > 0 && gameState.revealedLastDrawCount === 0) {
+      setPrevRevealedCount(0);
+    }
+  }, [gameState.dobonPhase, gameState.lastDrawCards, gameState.revealedLastDrawCount]);
+
   // カード公開数が変わったら演出テキスト表示
   useEffect(() => {
     const count = gameState.revealedLastDrawCount || 0;
@@ -483,40 +490,6 @@ export function GameBoard({
                 className="px-8 py-4 bg-white text-gray-800 font-bold text-xl rounded-lg hover:bg-gray-100 transition transform hover:scale-105"
               >
                 次へ
-              </button>
-            ) : (
-              <p className="text-white/70 animate-pulse">待機中...</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ラストドローフェーズ */}
-      {gameState.dobonPhase === 'lastDraw' && !isFinished && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
-          <div className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl p-8 shadow-2xl text-center max-w-lg">
-            <h2 className="text-4xl font-bold text-white mb-4">ラストドロー</h2>
-            {/* 勝者の手札を表示 */}
-            {gameState.dobonWinnerPlayerIds && gameState.dobonWinnerPlayerIds.map(winnerId => {
-              const winnerPlayer = gameState.players.find(p => p.playerId === winnerId);
-              return winnerPlayer?.hand && (
-                <div key={winnerId} className="mb-4">
-                  <p className="text-white/80 text-sm mb-2">{winnerPlayer.playerName} の手札</p>
-                  <div className="flex justify-center gap-2 flex-wrap">
-                    {winnerPlayer.hand.map(card => (
-                      <Card key={card.id} card={card} size="sm" disabled />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            <p className="text-white/90 mb-6">山札からカードを引いてスコアを決定します</p>
-            {gameState.dobonWinnerPlayerIds?.includes(playerId) ? (
-              <button
-                onClick={onAdvanceDobonPhase}
-                className="px-8 py-4 bg-white text-orange-600 font-bold text-xl rounded-lg hover:bg-gray-100 transition transform hover:scale-105"
-              >
-                ドロー！
               </button>
             ) : (
               <p className="text-white/70 animate-pulse">待機中...</p>

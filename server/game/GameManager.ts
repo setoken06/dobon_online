@@ -1079,15 +1079,11 @@ export class GameManager {
     }
 
     if (this.dobonPhase === 'success') {
-      this.dobonPhase = 'lastDraw';
-      return { success: true };
-    }
-
-    if (this.dobonPhase === 'lastDraw') {
+      // ドボン成功 → ラストドロー実行 → カードめくりフェーズへ直行
       this.performLastDraw();
       this.calculateFinalScores();
       this.dobonPhase = 'result';
-      this.revealedLastDrawCount = 0; // カードめくりカウントをリセット
+      this.revealedLastDrawCount = 0;
       return { success: true };
     }
 
