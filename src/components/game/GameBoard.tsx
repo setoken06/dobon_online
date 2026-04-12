@@ -158,12 +158,18 @@ export function GameBoard({
   // 出せるカードのIDセット
   const playableCardIds = useMemo(() => {
     if (!myPlayer?.hand) return new Set<string>();
-    return new Set(
-      myPlayer.hand
-        .filter(card => canPlayCard(card, gameState.topCard, gameState.effectiveTopCard))
-        .map(card => card.id)
-    );
-  }, [myPlayer?.hand, gameState.topCard, gameState.effectiveTopCard]);
+    let playable = myPlayer.hand.filter(card => canPlayCard(card, gameState.topCard, gameState.effectiveTopCard));
+
+    // UNOモード: ワイルド4は他に出せるカードがある場合は使用不可
+    if (gameState.gameMode === 'uno') {
+      const nonWild4 = playable.filter(card => !card.isWild4);
+      if (nonWild4.length > 0) {
+        playable = nonWild4;
+      }
+    }
+
+    return new Set(playable.map(card => card.id));
+  }, [myPlayer?.hand, gameState.topCard, gameState.effectiveTopCard, gameState.gameMode]);
 
   // カード選択ハンドラ
   const handleCardSelect = useCallback((cardId: string) => {
