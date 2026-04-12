@@ -157,6 +157,12 @@ export function GameBoard({
   // 出せるカードのIDセット
   const playableCardIds = useMemo(() => {
     if (!myPlayer?.hand) return new Set<string>();
+
+    // ドボン判定中・ドボン演出中・色選択中は全カード非アクティブ
+    if (gameState.isAnyoneDecidingDobon || gameState.dobonPhase || gameState.waitingForColorChoice) {
+      return new Set<string>();
+    }
+
     let playable = myPlayer.hand.filter(card => canPlayCard(card, gameState.topCard, gameState.effectiveTopCard));
 
     // UNOモード: ワイルド4は他に出せるカードがある場合は使用不可
@@ -168,7 +174,7 @@ export function GameBoard({
     }
 
     return new Set(playable.map(card => card.id));
-  }, [myPlayer?.hand, gameState.topCard, gameState.effectiveTopCard, gameState.gameMode]);
+  }, [myPlayer?.hand, gameState.topCard, gameState.effectiveTopCard, gameState.gameMode, gameState.isAnyoneDecidingDobon, gameState.dobonPhase, gameState.waitingForColorChoice]);
 
   // カード選択ハンドラ
   const handleCardSelect = useCallback((cardId: string) => {
