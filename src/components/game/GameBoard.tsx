@@ -153,17 +153,29 @@ export function GameBoard({
     setSelectedCardIds([]);
   }, [gameState.currentPlayerId]);
 
-  // 出せるカードがない場合、自動的に1枚引く
-  // 8枚以上で出せるカードがない場合も自動で引き続ける
+  // 出せるカードがない場合の自動ドロー
+  // - まだドローしていない → 自動で1枚引く
+  // - ドロー済み && 8枚以上 && 出せるカードなし → 強制で引き続ける
+  // - ドロー済み && 7枚以下 && 出せるカードなし → パス可能（自動ドローしない）
   // ドボン待機中は自動ドローしない
   useEffect(() => {
     if (isMyTurn && gameState.status === 'playing' && !isWaitingForDobonAction) {
-      // 出せるカードがない場合
       if (!hasPlayableCard) {
-        const timer = setTimeout(() => {
-          onDrawCard();
-        }, 500);
-        return () => clearTimeout(timer);
+        // まだドローしていない → 自動で引く
+        if (!gameState.hasDrawnThisTurn) {
+          const timer = setTimeout(() => {
+            onDrawCard();
+          }, 500);
+          return () => clearTimeout(timer);
+        }
+        // ドロー済み && 8枚以上 → 強制で引き続ける
+        if (gameState.hasDrawnThisTurn && handCount >= 8) {
+          const timer = setTimeout(() => {
+            onDrawCard();
+          }, 500);
+          return () => clearTimeout(timer);
+        }
+        // ドロー済み && 7枚以下 → パス可能、自動ドローしない
       }
     }
   }, [isMyTurn, gameState.hasDrawnThisTurn, hasPlayableCard, gameState.status, onDrawCard, handCount, isWaitingForDobonAction]);
