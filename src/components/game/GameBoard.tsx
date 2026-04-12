@@ -59,7 +59,6 @@ export function GameBoard({
   const [prevDobonPhase, setPrevDobonPhase] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    // dobonPhase が 'success' に変わった瞬間を検知
     if (gameState.dobonPhase === 'success' && prevDobonPhase !== 'success') {
       let text = 'ドボン！';
       if (gameState.isDobonGaeshi) {
@@ -73,6 +72,50 @@ export function GameBoard({
     }
     setPrevDobonPhase(gameState.dobonPhase);
   }, [gameState.dobonPhase, gameState.isDobonGaeshi, gameState.loser?.isTsumoDobon, prevDobonPhase]);
+
+  // ラストドロー演出
+  const [lastDrawAnimState, setLastDrawAnimState] = useState<'idle' | 'flipping' | 'done'>('idle');
+  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
+  const [lastDrawAnnouncement, setLastDrawAnnouncement] = useState<string | null>(null);
+
+  // dobonPhase が 'result' に変わった瞬間にラストドロー演出開始
+  useEffect(() => {
+    if (gameState.dobonPhase === 'result' && prevDobonPhase === 'lastDraw' && gameState.lastDrawCards && gameState.lastDrawCards.length > 0) {
+      setLastDrawAnimState('flipping');
+      setFlippedCards(new Set());
+      setLastDrawAnnouncement(null);
+    }
+    if (!gameState.dobonPhase) {
+      setLastDrawAnimState('idle');
+      setFlippedCards(new Set());
+      setLastDrawAnnouncement(null);
+    }
+  }, [gameState.dobonPhase, prevDobonPhase, gameState.lastDrawCards]);
+
+  const handleFlipCard = useCallback((index: number) => {
+    if (!gameState.lastDrawCards) return;
+    const card = gameState.lastDrawCards[index];
+    setFlippedCards(prev => {
+      const next = new Set(prev);
+      next.add(index);
+
+      // 演出テキスト
+      const isWild = card.suit === 'wild' || card.suit === 'joker';
+      if (isWild) {
+        setLastDrawAnnouncement('×2！');
+      } else {
+        const value = card.unoSpecial ? 10 : card.rank;
+        setLastDrawAnnouncement(`×${value}！`);
+      }
+      setTimeout(() => setLastDrawAnnouncement(null), 1500);
+
+      // 全カードがめくられたら演出完了 → リザルト表示
+      if (next.size === gameState.lastDrawCards!.length) {
+        setTimeout(() => setLastDrawAnimState('done'), 2000);
+      }
+      return next;
+    });
+  }, [gameState.lastDrawCards]);
 
   // ドボン/ドボン返し待機中 or ドボン演出中はアクション不可
   const isWaitingForDobonAction = gameState.isWaitingForDobon || gameState.isWaitingForDobonGaeshi || !!gameState.dobonPhase || !!gameState.isAnyoneDecidingDobon;
@@ -471,8 +514,48 @@ export function GameBoard({
         </div>
       )}
 
-      {/* ドボンリザルトフェーズ */}
-      {gameState.dobonPhase === 'result' && gameState.winners && (
+      {/* ラストドロー演出（カードめくり） */}
+      {gameState.dobonPhase === 'result' && lastDrawAnimState === 'flipping' && gameState.lastDrawCards && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-40">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-white mb-6">ラストドロー</h2>
+            <div className="flex justify-center gap-4 flex-wrap mb-6">
+              {gameState.lastDrawCards.map((card, index) => (
+                <div key={index} className="cursor-pointer" onClick={() => !flippedCards.has(index) && (index === 0 || flippedCards.has(index - 1)) && handleFlipCard(index)}>
+                  {flippedCards.has(index) ? (
+                    <div className="animate-bounce">
+                      <Card card={card} size="lg" disabled />
+                    </div>
+                  ) : (
+                    <div className={`w-20 h-28 bg-blue-800 rounded-lg border-2 border-blue-900 shadow-md flex items-center justify-center ${
+                      (index === 0 || flippedCards.has(index - 1)) ? 'animate-pulse cursor-pointer hover:border-yellow-400' : 'opacity-50'
+                    }`}>
+                      <div className="w-3/4 h-3/4 bg-blue-700 rounded border border-blue-600 flex items-center justify-center">
+                        <span className="text-blue-400 text-2xl">?</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* めくり演出テキスト */}
+            {lastDrawAnnouncement && (
+              <div className="animate-bounce">
+                <span className="text-5xl font-black text-yellow-300 drop-shadow-[0_0_20px_rgba(255,200,0,0.8)]"
+                  style={{ textShadow: '0 0 20px rgba(255,200,0,0.9), 0 4px 8px rgba(0,0,0,0.5)' }}>
+                  {lastDrawAnnouncement}
+                </span>
+              </div>
+            )}
+            {!lastDrawAnnouncement && flippedCards.size === 0 && (
+              <p className="text-white/70">カードをタップしてめくってください</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ドボンリザルトフェーズ（演出完了後 or 演出なし） */}
+      {gameState.dobonPhase === 'result' && gameState.winners && (lastDrawAnimState === 'done' || lastDrawAnimState === 'idle') && (
         <GameResult
           winnerName={gameState.winners[0]?.playerName || ''}
           isWinner={gameState.winners.some(w => w.playerId === playerId)}

@@ -171,25 +171,12 @@ export function GameResult({
           )
         )}
 
-        {dobonWinnerPlayerIds ? (
-          dobonWinnerPlayerIds.includes(playerId) ? (
-            <button
-              onClick={onBackToLobby}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
-            >
-              待機画面に戻る
-            </button>
-          ) : (
-            <p className="text-gray-400 animate-pulse">待機中...</p>
-          )
-        ) : (
-          <button
-            onClick={onBackToLobby}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
-          >
-            待機画面に戻る
-          </button>
-        )}
+        <button
+          onClick={onBackToLobby}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
+        >
+          待機画面に戻る
+        </button>
       </div>
     </div>
   );
