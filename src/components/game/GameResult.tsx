@@ -139,7 +139,9 @@ export function GameResult({
             <p className="text-sm text-gray-600 mb-2">勝者一覧</p>
             <div className="space-y-2">
               {winners.map((winner) => {
-                const multiplier = getHandCountMultiplier(winner.handCount);
+                const multiplier = winner.isDobonGaeshi
+                  ? winner.gaeshiMultiplier || 0
+                  : getHandCountMultiplier(winner.handCount);
                 return (
                   <div
                     key={winner.playerId}
@@ -148,12 +150,13 @@ export function GameResult({
                     <p className={`font-bold text-sm ${winner.playerId === playerId ? 'text-orange-600' : 'text-gray-700'}`}>
                       {winner.playerName}
                       {winner.playerId === playerId && ' (あなた)'}
+                      {winner.isDobonGaeshi && ' 🔄 ドボン返し'}
                     </p>
                     <p className="text-lg font-bold text-orange-600">
                       {winner.finalScore.toLocaleString()} EVJ
                     </p>
                     <p className="text-xs text-gray-500">
-                      {rate} EVJ × {lastDrawValue} × {multiplier}倍（{winner.handCount}枚）
+                      {rate} EVJ × {lastDrawValue} × {multiplier}倍{winner.isDobonGaeshi ? '（ドボン返し）' : `（${winner.handCount}枚）`}
                     </p>
                   </div>
                 );
@@ -166,9 +169,15 @@ export function GameResult({
             <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-lg p-3 md:p-4 mb-4">
               <p className="text-sm text-gray-600 mb-1">勝利点</p>
               <p className="text-2xl md:text-3xl font-bold text-orange-600">{finalScore.toLocaleString()} EVJ</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {rate} EVJ × {lastDrawValue} × {getHandCountMultiplier(winnerHandCount || 1)}倍（{winnerHandCount || 1}枚）
-              </p>
+              {winners?.[0]?.isDobonGaeshi ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  {rate} EVJ × {lastDrawValue} × {winners[0].gaeshiMultiplier}倍（ドボン返し 🔄）
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">
+                  {rate} EVJ × {lastDrawValue} × {getHandCountMultiplier(winnerHandCount || 1)}倍（{winnerHandCount || 1}枚）
+                </p>
+              )}
             </div>
           )
         )}

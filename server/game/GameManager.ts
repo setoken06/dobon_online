@@ -857,6 +857,14 @@ export class GameManager {
       return { success: false, error: 'あなたのターンではありません' };
     }
 
+    // 手札が8枚以上で出せるカードがある場合、ドローできない（カードを出してスキップのみ）
+    if (!this.hasDrawnThisTurn && currentPlayer.hand.length >= 8) {
+      const playableCards = this.getPlayableCards(playerId);
+      if (playableCards.length > 0) {
+        return { success: false, error: '手札が8枚以上で出せるカードがあります。カードを出してください' };
+      }
+    }
+
     if (this.hasDrawnThisTurn) {
       const playableCards = this.getPlayableCards(playerId);
       if (currentPlayer.hand.length < 7 || playableCards.length > 0) {
@@ -1121,8 +1129,10 @@ export class GameManager {
       this.winners = [{
         playerId: gaeshiWinner.playerId,
         playerName: gaeshiWinner.playerName,
-        handCount: this.pendingGaeshiTotalMultiplier,
+        handCount: gaeshiWinner.handCount,
         finalScore: score,
+        isDobonGaeshi: true,
+        gaeshiMultiplier: this.pendingGaeshiTotalMultiplier,
       }];
     } else {
       this.winners = [];

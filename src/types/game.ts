@@ -15,6 +15,8 @@ export interface WinnerInfo {
   playerName: string;
   handCount: number;
   finalScore: number;
+  isDobonGaeshi?: boolean;
+  gaeshiMultiplier?: number;
 }
 
 // 敗者情報（ドボンされたプレイヤー）
