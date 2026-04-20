@@ -210,7 +210,6 @@ export class GameManager {
     this.currentPlayerIndex = ((this.currentPlayerIndex + step) % this.players.length + this.players.length) % this.players.length;
     this.hasDrawnThisTurn = false;
     this.dobonablePlayerIds.clear();
-    this.minogashiPlayerName = undefined;
   }
 
   private findPlayer(playerId: string): InternalPlayerState | undefined {
@@ -698,6 +697,9 @@ export class GameManager {
       return { success: false, error: 'そのカードは出せません' };
     }
 
+    // 見逃し演出をクリア
+    this.minogashiPlayerName = undefined;
+
     // カードを出す
     for (const card of cards) {
       const cardIndex = currentPlayer.hand.findIndex(c => c.id === card.id);
@@ -874,6 +876,9 @@ export class GameManager {
         return { success: false, error: '既にカードを引いています' };
       }
     }
+
+    // 見逃し演出をクリア
+    this.minogashiPlayerName = undefined;
 
     this.refillDeckIfNeeded();
 
