@@ -32,6 +32,7 @@ export class GameManager {
   private playersWhoDoboned: Map<string, DobonPlayerInfo> = new Map();
   private playersWhoSkippedDobon: Set<string> = new Set();
   private rate: number;
+  private minogashiPlayerName?: string; // 見逃し演出用
   private lastDrawCards: Card[] = [];
   // ドボン返し関連
   private dobonGaeshiEligiblePlayerIds: Set<string> = new Set();
@@ -209,6 +210,7 @@ export class GameManager {
     this.currentPlayerIndex = ((this.currentPlayerIndex + step) % this.players.length + this.players.length) % this.players.length;
     this.hasDrawnThisTurn = false;
     this.dobonablePlayerIds.clear();
+    this.minogashiPlayerName = undefined;
   }
 
   private findPlayer(playerId: string): InternalPlayerState | undefined {
@@ -525,6 +527,7 @@ export class GameManager {
       waitingForColorChoice: this.waitingForColorChoice || undefined,
       colorChoicePlayerId: this.colorChoicePlayerId,
       revealedLastDrawCount: this.dobonPhase === 'result' ? this.revealedLastDrawCount : undefined,
+      minogashiPlayerName: this.minogashiPlayerName,
     };
   }
 
@@ -973,14 +976,19 @@ export class GameManager {
     return { success: true, allResponded: false };
   }
 
-  // ドボンをスキップ
+  // ドボンをスキップ（見逃し: レート2倍）
   skipDobon(playerId: string): { success: boolean; error?: string; allResponded?: boolean } {
     if (!this.dobonablePlayerIds.has(playerId)) {
       return { success: false, error: 'ドボンの権利がありません' };
     }
 
+    const player = this.findPlayer(playerId);
     this.playersWhoSkippedDobon.add(playerId);
     this.dobonablePlayerIds.delete(playerId);
+
+    // 見逃し: レート2倍
+    this.rate *= 2;
+    this.minogashiPlayerName = player?.playerName;
 
     if (this.dobonablePlayerIds.size === 0) {
       return this.resolveDobonPhase();

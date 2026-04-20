@@ -82,6 +82,7 @@ export interface GameState {
   waitingForColorChoice?: boolean;          // ワイルド使用後の色選択待ち
   colorChoicePlayerId?: string;             // 色選択するプレイヤーID
   revealedLastDrawCount?: number;           // ラストドローで公開済みのカード数
+  minogashiPlayerName?: string;             // 見逃し演出（ドボンスキップでレート2倍）
 }
 
 // ゲーム設定

@@ -127,6 +127,21 @@ export function GameBoard({
     }
   }, [gameState.dobonPhase]);
 
+  // 見逃し演出（ドボンスキップでレート2倍）
+  const [minogashiText, setMinogashiText] = useState<string | null>(null);
+  const [prevMinogashi, setPrevMinogashi] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (gameState.minogashiPlayerName && gameState.minogashiPlayerName !== prevMinogashi) {
+      setMinogashiText(`${gameState.minogashiPlayerName} 見逃し！\nレート×2`);
+      const timer = setTimeout(() => setMinogashiText(null), 2000);
+      setPrevMinogashi(gameState.minogashiPlayerName);
+      return () => clearTimeout(timer);
+    }
+    if (!gameState.minogashiPlayerName) {
+      setPrevMinogashi(undefined);
+    }
+  }, [gameState.minogashiPlayerName, prevMinogashi]);
+
   const isWinnerPlayer = gameState.dobonWinnerPlayerIds?.includes(playerId);
   const revealedCount = gameState.revealedLastDrawCount || 0;
   // revealedCount >= totalCards * 2 = 全カード公開+確認完了（リザルト表示可能）
@@ -465,6 +480,23 @@ export function GameBoard({
               100% { transform: scale(1); opacity: 1; }
             }
           `}</style>
+        </div>
+      )}
+
+      {/* 見逃し演出オーバーレイ */}
+      {minogashiText && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div className="animate-bounce">
+            <h1
+              className="text-5xl md:text-7xl font-black text-yellow-300 whitespace-pre-line text-center"
+              style={{
+                textShadow: '0 0 20px rgba(255,200,0,0.9), 0 0 60px rgba(255,150,0,0.5), 0 4px 8px rgba(0,0,0,0.5)',
+                animation: 'announcePulse 0.5s ease-in-out',
+              }}
+            >
+              {minogashiText}
+            </h1>
+          </div>
         </div>
       )}
 
