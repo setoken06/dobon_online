@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { GameState } from '../../types/game';
 import { canPlayCard, UnoColor, UNO_COLORS } from '../../types/card';
 import { Hand } from './Hand';
@@ -129,18 +129,22 @@ export function GameBoard({
 
   // 見逃し演出（ドボンスキップでレート2倍）
   const [minogashiText, setMinogashiText] = useState<string | null>(null);
-  const [prevMinogashi, setPrevMinogashi] = useState<string | undefined>(undefined);
+  const minogashiTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevMinogashiRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (gameState.minogashiPlayerName && gameState.minogashiPlayerName !== prevMinogashi) {
+    if (gameState.minogashiPlayerName && gameState.minogashiPlayerName !== prevMinogashiRef.current) {
+      prevMinogashiRef.current = gameState.minogashiPlayerName;
       setMinogashiText(`${gameState.minogashiPlayerName} 見逃し！\nレート×2`);
-      const timer = setTimeout(() => setMinogashiText(null), 2000);
-      setPrevMinogashi(gameState.minogashiPlayerName);
-      return () => clearTimeout(timer);
+      if (minogashiTimerRef.current) clearTimeout(minogashiTimerRef.current);
+      minogashiTimerRef.current = setTimeout(() => {
+        setMinogashiText(null);
+        minogashiTimerRef.current = null;
+      }, 2000);
     }
     if (!gameState.minogashiPlayerName) {
-      setPrevMinogashi(undefined);
+      prevMinogashiRef.current = undefined;
     }
-  }, [gameState.minogashiPlayerName, prevMinogashi]);
+  }, [gameState.minogashiPlayerName]);
 
   const isWinnerPlayer = gameState.dobonWinnerPlayerIds?.includes(playerId);
   const revealedCount = gameState.revealedLastDrawCount || 0;
