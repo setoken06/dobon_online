@@ -565,23 +565,7 @@ app.prepare().then(() => {
         const roundState = roomStore.getRoundState(roomId);
         if (!roundState || roundState.isRoundComplete) return;
 
-        // 現在のゲームの結果を累計スコアに反映
-        const oldGame = roomStore.getGame(roomId);
-        if (oldGame) {
-          const { winners } = oldGame.getWinner();
-          const loser = oldGame.getLoser();
-          if (winners && winners.length > 0) {
-            const totalWinScore = winners.reduce((s, w) => s + w.finalScore, 0);
-            for (const winner of winners) {
-              const ps = roundState.playerScores.find(s => s.playerId === winner.playerId);
-              if (ps) ps.cumulativeScore += winner.finalScore;
-            }
-            if (loser) {
-              const ls = roundState.playerScores.find(s => s.playerId === loser.playerId);
-              if (ls) ls.cumulativeScore -= totalWinScore;
-            }
-          }
-        }
+        // スコアはGameManager.calculateFinalScores()で既に加算済み
 
         // 次の親へ
         roundState.currentOyaIndex = (roundState.currentOyaIndex + 1) % room.players.length;
@@ -593,8 +577,13 @@ app.prepare().then(() => {
         if (roundState.currentGameNumber > roundState.totalGames) {
           roundState.isRoundComplete = true;
           roomStore.setRoundState(roomId, roundState);
-          // 最終結果を表示（backToLobbyで待機画面に戻れる）
-          io.to(roomId).emit('game:roundComplete', { oyakoRoundState: roundState });
+
+          // 最終局: 待機画面に戻す
+          roomStore.clearRoundState(roomId);
+          roomStore.setRoomStatus(roomId, 'waiting');
+          io.to(roomId).emit('game:backToLobby');
+          io.to(roomId).emit('room:updated', { room: { ...room, status: 'waiting' } });
+          console.log(`Oyako round complete, back to lobby: ${roomId}`);
           return;
         }
 
@@ -630,25 +619,8 @@ app.prepare().then(() => {
           return;
         }
 
-        // 親子ルール: 最終ゲームの結果を累計に反映
+        // 親子ルール: ラウンド状態をクリア（スコアはGameManager側で既に加算済み）
         if (room.oyakoRule) {
-          const roundState = roomStore.getRoundState(roomId);
-          const oldGame = roomStore.getGame(roomId);
-          if (roundState && oldGame) {
-            const { winners } = oldGame.getWinner();
-            const loser = oldGame.getLoser();
-            if (winners && winners.length > 0) {
-              const totalWinScore = winners.reduce((s, w) => s + w.finalScore, 0);
-              for (const winner of winners) {
-                const ps = roundState.playerScores.find(s => s.playerId === winner.playerId);
-                if (ps) ps.cumulativeScore += winner.finalScore;
-              }
-              if (loser) {
-                const ls = roundState.playerScores.find(s => s.playerId === loser.playerId);
-                if (ls) ls.cumulativeScore -= totalWinScore;
-              }
-            }
-          }
           roomStore.clearRoundState(roomId);
         }
 

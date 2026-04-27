@@ -1174,6 +1174,19 @@ export class GameManager {
         });
       }
     }
+
+    // 親子ルール: 累計スコアに現在のゲーム結果を反映
+    if (this.oyakoRoundState && this.winners.length > 0) {
+      const totalWinScore = this.winners.reduce((s, w) => s + w.finalScore, 0);
+      for (const winner of this.winners) {
+        const ps = this.oyakoRoundState.playerScores.find(s => s.playerId === winner.playerId);
+        if (ps) ps.cumulativeScore += winner.finalScore;
+      }
+      if (this.loser) {
+        const ls = this.oyakoRoundState.playerScores.find(s => s.playerId === this.loser!.playerId);
+        if (ls) ls.cumulativeScore -= totalWinScore;
+      }
+    }
   }
 
   // ドボン返し
