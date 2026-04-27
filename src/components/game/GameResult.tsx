@@ -1,7 +1,7 @@
 'use client';
 
 import { Card as CardType, isJokerCard, isWildCard } from '../../types/card';
-import { WinnerInfo, LoserInfo, PlayerGameState } from '../../types/game';
+import { WinnerInfo, LoserInfo, PlayerGameState, OyakoRoundState } from '../../types/game';
 import { Card } from './Card';
 
 interface GameResultProps {
@@ -9,6 +9,7 @@ interface GameResultProps {
   isWinner: boolean;
   isHost?: boolean;
   onBackToLobby: () => void;
+  onNextRoundGame?: () => void;
   lastDrawCards?: CardType[];
   finalScore?: number;
   winnerHandCount?: number;
@@ -19,6 +20,7 @@ interface GameResultProps {
   dobonWinnerPlayerIds?: string[];
   dobonTriggerCard?: CardType;
   winnerPlayers?: PlayerGameState[];
+  oyakoRoundState?: OyakoRoundState;
 }
 
 export function GameResult({
@@ -26,6 +28,7 @@ export function GameResult({
   isWinner,
   isHost = false,
   onBackToLobby,
+  onNextRoundGame,
   lastDrawCards,
   finalScore,
   winnerHandCount,
@@ -36,6 +39,7 @@ export function GameResult({
   dobonWinnerPlayerIds,
   dobonTriggerCard,
   winnerPlayers,
+  oyakoRoundState,
 }: GameResultProps) {
   // ラストドローの最終カード（ジョーカー/ワイルド以外）を取得
   const lastNonJokerCard = lastDrawCards?.find(c => !isJokerCard(c) && !isWildCard(c));
@@ -182,15 +186,61 @@ export function GameResult({
           )
         )}
 
+        {/* 親子ルール: 累計スコア */}
+        {oyakoRoundState && (
+          <div className="bg-purple-50 rounded-lg p-3 mb-4">
+            <p className="text-sm text-purple-600 font-bold mb-2">
+              第{oyakoRoundState.currentGameNumber}/{oyakoRoundState.totalGames}局
+              {oyakoRoundState.isRoundComplete && ' - 最終結果'}
+            </p>
+            <div className="space-y-1">
+              {[...oyakoRoundState.playerScores]
+                .sort((a, b) => b.cumulativeScore - a.cumulativeScore)
+                .map((ps) => (
+                  <div
+                    key={ps.playerId}
+                    className={`flex justify-between items-center px-2 py-1 rounded ${
+                      ps.playerId === playerId ? 'bg-purple-200' : 'bg-white/50'
+                    }`}
+                  >
+                    <span className={`text-sm ${ps.playerId === playerId ? 'font-bold text-purple-700' : 'text-gray-700'}`}>
+                      {ps.playerName}
+                      {ps.playerId === playerId && ' (あなた)'}
+                    </span>
+                    <span className={`text-sm font-bold ${
+                      ps.cumulativeScore > 0 ? 'text-green-600' : ps.cumulativeScore < 0 ? 'text-red-600' : 'text-gray-500'
+                    }`}>
+                      {ps.cumulativeScore > 0 ? '+' : ''}{ps.cumulativeScore.toLocaleString()} EVJ
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* ボタン */}
         {isHost ? (
-          <button
-            onClick={onBackToLobby}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
-          >
-            待機画面に戻る
-          </button>
+          oyakoRoundState && !oyakoRoundState.isRoundComplete ? (
+            <button
+              onClick={onBackToLobby}
+              className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white text-lg font-semibold rounded-lg transition"
+            >
+              次の局へ
+            </button>
+          ) : (
+            <button
+              onClick={onBackToLobby}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg transition"
+            >
+              待機画面に戻る
+            </button>
+          )
         ) : (
-          <p className="text-gray-400 text-sm">ホストが待機画面に戻るのを待っています...</p>
+          <p className="text-gray-400 text-sm">
+            {oyakoRoundState && !oyakoRoundState.isRoundComplete
+              ? 'ホストが次の局に進むのを待っています...'
+              : 'ホストが待機画面に戻るのを待っています...'}
+          </p>
         )}
       </div>
     </div>

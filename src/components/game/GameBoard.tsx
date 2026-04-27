@@ -24,6 +24,7 @@ interface GameBoardProps {
   onDobonGaeshi: () => void;
   onSkipDobonGaeshi: () => void;
   onBackToLobby: () => void;
+  onNextRoundGame?: () => void;
   onConfirmInitialRate: () => void;
   onAdvanceDobonPhase: () => void;
   onChooseColor?: (color: UnoColor) => void;
@@ -43,6 +44,7 @@ export function GameBoard({
   onDobonGaeshi,
   onSkipDobonGaeshi,
   onBackToLobby,
+  onNextRoundGame,
   onConfirmInitialRate,
   onAdvanceDobonPhase,
   onChooseColor,
@@ -285,6 +287,7 @@ export function GameBoard({
           isWinner={isWinner}
           isHost={isHost}
           onBackToLobby={onBackToLobby}
+          onNextRoundGame={onNextRoundGame}
           lastDrawCards={gameState.lastDrawCards}
           finalScore={gameState.finalScore}
           winnerHandCount={gameState.winnerHandCount}
@@ -292,6 +295,7 @@ export function GameBoard({
           winners={gameState.winners}
           playerId={playerId}
           loser={gameState.loser}
+          oyakoRoundState={gameState.oyakoRoundState}
         />
       )}
 
@@ -306,18 +310,33 @@ export function GameBoard({
             {gameState.players.find((p) => p.playerId === gameState.currentPlayerId)?.playerName} のターン
           </div>
         )}
-        <div className="bg-black/50 text-white px-3 py-1 rounded-lg">
-          <span className="text-xs">レート</span>
-          <span className="ml-1 text-sm font-bold text-yellow-400">{gameState.rate} EVJ</span>
+        <div className="flex gap-1 items-center">
+          {gameState.oyakoRoundState && (
+            <div className="bg-purple-900/70 text-white px-2 py-1 rounded-lg">
+              <span className="text-xs">{gameState.oyakoRoundState.currentGameNumber}/{gameState.oyakoRoundState.totalGames}局</span>
+              <span className="ml-1 text-xs font-bold text-purple-300">親:{gameState.oyakoRoundState.oyaPlayerName}</span>
+            </div>
+          )}
+          <div className="bg-black/50 text-white px-3 py-1 rounded-lg">
+            <span className="text-xs">レート</span>
+            <span className="ml-1 text-sm font-bold text-yellow-400">{gameState.rate} EVJ</span>
+          </div>
         </div>
       </div>
 
-      {/* PC用: レート表示（右上固定） */}
-      <div className="hidden md:block absolute top-4 right-4">
+      {/* PC用: レート + 親表示（右上固定） */}
+      <div className="hidden md:block absolute top-4 right-4 space-y-1">
         <div className="bg-black/50 text-white px-4 py-2 rounded-lg">
           <span className="text-sm">レート</span>
           <span className="ml-2 text-xl font-bold text-yellow-400">{gameState.rate} EVJ</span>
         </div>
+        {gameState.oyakoRoundState && (
+          <div className="bg-purple-900/70 text-white px-4 py-2 rounded-lg text-center">
+            <span className="text-xs">第{gameState.oyakoRoundState.currentGameNumber}/{gameState.oyakoRoundState.totalGames}局</span>
+            <span className="ml-2 text-sm font-bold text-purple-300">親: {gameState.oyakoRoundState.oyaPlayerName}</span>
+            {gameState.oyaPlayerId === playerId && <span className="ml-1 text-yellow-400">（あなた）</span>}
+          </div>
+        )}
       </div>
 
       {/* 初期レートボーナス確認ポップアップ */}
@@ -633,7 +652,16 @@ export function GameBoard({
           winnerName={gameState.winners[0]?.playerName || ''}
           isWinner={gameState.winners.some(w => w.playerId === playerId)}
           isHost={isHost}
-          onBackToLobby={() => { setResultDismissed(true); onAdvanceDobonPhase(); setTimeout(onBackToLobby, 300); }}
+          onBackToLobby={() => {
+            setResultDismissed(true);
+            onAdvanceDobonPhase();
+            if (gameState.oyakoRoundState && !gameState.oyakoRoundState.isRoundComplete) {
+              setTimeout(() => onNextRoundGame?.(), 300);
+            } else {
+              setTimeout(onBackToLobby, 300);
+            }
+          }}
+          onNextRoundGame={onNextRoundGame}
           lastDrawCards={gameState.lastDrawCards}
           finalScore={gameState.finalScore}
           winnerHandCount={gameState.winnerHandCount}
@@ -646,6 +674,7 @@ export function GameBoard({
           winnerPlayers={gameState.dobonWinnerPlayerIds
             ?.map(id => gameState.players.find(p => p.playerId === id))
             .filter((p): p is typeof gameState.players[0] => !!p)}
+          oyakoRoundState={gameState.oyakoRoundState}
         />
       )}
 

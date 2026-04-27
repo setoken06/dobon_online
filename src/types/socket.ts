@@ -1,10 +1,10 @@
 import { Card, Suit, GameMode, UnoColor } from './card';
 import { Room, Player } from './room';
-import { GameState } from './game';
+import { GameState, OyakoRoundState } from './game';
 
 // クライアント → サーバー
 export interface ClientToServerEvents {
-  'room:create': (data: { roomId: string; playerName: string; sessionId: string; jokerCount?: number; rate?: number; myMark: Suit; gameMode?: GameMode }) => void;
+  'room:create': (data: { roomId: string; playerName: string; sessionId: string; jokerCount?: number; rate?: number; myMark: Suit; gameMode?: GameMode; oyakoRule?: boolean }) => void;
   'room:join': (data: { roomId: string; playerName: string; sessionId: string; myMark: Suit }) => void;
   'room:rejoin': (data: { roomId: string; sessionId: string; playerName: string }) => void;
   'room:leave': (data: { roomId: string }) => void;
@@ -17,6 +17,7 @@ export interface ClientToServerEvents {
   'game:dobonGaeshi': (data: { roomId: string }) => void;
   'game:skipDobonGaeshi': (data: { roomId: string }) => void;
   'game:backToLobby': (data: { roomId: string }) => void;
+  'game:nextRoundGame': (data: { roomId: string }) => void;
   'game:confirmInitialRate': (data: { roomId: string }) => void;
   'game:advanceDobonPhase': (data: { roomId: string }) => void;
   'game:chooseColor': (data: { roomId: string; color: UnoColor }) => void;
@@ -42,6 +43,7 @@ export interface ServerToClientEvents {
   'game:cardDrawn': (data: { playerId: string; card?: Card }) => void;
   'game:finished': (data: { winnerId: string; winnerName: string }) => void;
   'game:backToLobby': () => void;
+  'game:roundComplete': (data: { oyakoRoundState: OyakoRoundState }) => void;
   'game:error': (data: { message: string }) => void;
 }
 

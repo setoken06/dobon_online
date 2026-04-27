@@ -1,17 +1,20 @@
 import { Room, Player, DEFAULT_ROOM_CONFIG } from '../../src/types/room';
 import { GameManager } from '../game/GameManager';
 import { GameMode } from '../../src/types/card';
+import { OyakoRoundState } from '../../src/types/game';
 
 export class RoomStore {
   private rooms: Map<string, Room> = new Map();
   private games: Map<string, GameManager> = new Map();
+  private roundStates: Map<string, OyakoRoundState> = new Map();
 
   createRoom(
     roomId: string,
     host: Player,
     jokerCount: number = DEFAULT_ROOM_CONFIG.jokerCount,
     rate: number = DEFAULT_ROOM_CONFIG.rate,
-    gameMode: GameMode = 'classic'
+    gameMode: GameMode = 'classic',
+    oyakoRule: boolean = false
   ): Room {
     if (this.rooms.has(roomId)) {
       throw new Error('この部屋IDは既に使用されています');
@@ -27,6 +30,7 @@ export class RoomStore {
       jokerCount: Math.max(0, Math.min(4, jokerCount)),
       rate: Math.max(1, rate),
       gameMode,
+      oyakoRule,
     };
 
     this.rooms.set(roomId, room);
@@ -86,13 +90,13 @@ export class RoomStore {
     }
   }
 
-  createGame(roomId: string): GameManager {
+  createGame(roomId: string, startPlayerIndex?: number): GameManager {
     const room = this.rooms.get(roomId);
     if (!room) {
       throw new Error('部屋が見つかりません');
     }
 
-    const game = new GameManager(roomId, room.players, room.jokerCount, room.rate, room.gameMode);
+    const game = new GameManager(roomId, room.players, room.jokerCount, room.rate, room.gameMode, startPlayerIndex);
     this.games.set(roomId, game);
     return game;
   }
@@ -101,9 +105,23 @@ export class RoomStore {
     return this.games.get(roomId);
   }
 
+  // 親子ルール: ラウンド状態管理
+  getRoundState(roomId: string): OyakoRoundState | undefined {
+    return this.roundStates.get(roomId);
+  }
+
+  setRoundState(roomId: string, state: OyakoRoundState): void {
+    this.roundStates.set(roomId, state);
+  }
+
+  clearRoundState(roomId: string): void {
+    this.roundStates.delete(roomId);
+  }
+
   deleteRoom(roomId: string): void {
     this.rooms.delete(roomId);
     this.games.delete(roomId);
+    this.roundStates.delete(roomId);
   }
 
   // セッションIDでプレイヤーを検索

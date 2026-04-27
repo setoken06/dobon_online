@@ -41,7 +41,7 @@ app.prepare().then(() => {
     console.log('Client connected:', socket.id);
 
     // 部屋を作成
-    socket.on('room:create', ({ roomId, playerName, sessionId, jokerCount, rate, myMark, gameMode }) => {
+    socket.on('room:create', ({ roomId, playerName, sessionId, jokerCount, rate, myMark, gameMode, oyakoRule }) => {
       try {
         const host: Player = {
           id: socket.id,
@@ -58,7 +58,8 @@ app.prepare().then(() => {
         // rateが未定義または無効な場合はデフォルト値(100)を使用
         const validRate = typeof rate === 'number' && rate > 0 ? rate : 100;
         const validGameMode = gameMode === 'uno' ? 'uno' as const : 'classic' as const;
-        const room = roomStore.createRoom(roomId, host, validJokerCount, validRate, validGameMode);
+        const validOyakoRule = oyakoRule === true;
+        const room = roomStore.createRoom(roomId, host, validJokerCount, validRate, validGameMode, validOyakoRule);
         socket.join(roomId);
         socket.data.roomId = roomId;
         socket.data.playerId = socket.id;
@@ -183,8 +184,38 @@ app.prepare().then(() => {
           return;
         }
 
-        const game = roomStore.createGame(roomId);
+        let startPlayerIndex: number | undefined;
+
+        // 親子ルール: ラウンド初期化
+        if (room.oyakoRule) {
+          const oyaIndex = Math.floor(Math.random() * room.players.length);
+          startPlayerIndex = oyaIndex;
+          const roundState = {
+            currentOyaIndex: oyaIndex,
+            currentGameNumber: 1,
+            totalGames: room.players.length,
+            playerScores: room.players.map((p, i) => ({
+              playerId: p.id,
+              playerName: p.name,
+              cumulativeScore: 0,
+              wasOya: i === oyaIndex,
+            })),
+            isRoundComplete: false,
+            oyaPlayerId: room.players[oyaIndex].id,
+            oyaPlayerName: room.players[oyaIndex].name,
+          };
+          roomStore.setRoundState(roomId, roundState);
+        }
+
+        const game = roomStore.createGame(roomId, startPlayerIndex);
         roomStore.setRoomStatus(roomId, 'playing');
+
+        // 親子ルール: ゲームに親情報をセット
+        if (room.oyakoRule) {
+          const roundState = roomStore.getRoundState(roomId)!;
+          game.setOyaPlayerId(roundState.oyaPlayerId);
+          game.setOyakoRoundState(roundState);
+        }
 
         // 各プレイヤーに個別の状態を送信
         for (const player of room.players) {
@@ -195,7 +226,7 @@ app.prepare().then(() => {
           }
         }
 
-        console.log(`Game started in room: ${roomId}`);
+        console.log(`Game started in room: ${roomId}${room.oyakoRule ? ' (oyako rule)' : ''}`);
       } catch (error) {
         socket.emit('game:error', {
           message: error instanceof Error ? error.message : 'ゲームの開始に失敗しました'
@@ -525,6 +556,71 @@ app.prepare().then(() => {
       }
     });
 
+    // 親子ルール: 次の局へ進む
+    socket.on('game:nextRoundGame', ({ roomId }) => {
+      try {
+        const room = roomStore.getRoom(roomId);
+        if (!room || !room.oyakoRule) return;
+
+        const roundState = roomStore.getRoundState(roomId);
+        if (!roundState || roundState.isRoundComplete) return;
+
+        // 現在のゲームの結果を累計スコアに反映
+        const oldGame = roomStore.getGame(roomId);
+        if (oldGame) {
+          const { winners } = oldGame.getWinner();
+          const loser = oldGame.getLoser();
+          if (winners && winners.length > 0) {
+            const totalWinScore = winners.reduce((s, w) => s + w.finalScore, 0);
+            for (const winner of winners) {
+              const ps = roundState.playerScores.find(s => s.playerId === winner.playerId);
+              if (ps) ps.cumulativeScore += winner.finalScore;
+            }
+            if (loser) {
+              const ls = roundState.playerScores.find(s => s.playerId === loser.playerId);
+              if (ls) ls.cumulativeScore -= totalWinScore;
+            }
+          }
+        }
+
+        // 次の親へ
+        roundState.currentOyaIndex = (roundState.currentOyaIndex + 1) % room.players.length;
+        roundState.currentGameNumber += 1;
+        roundState.oyaPlayerId = room.players[roundState.currentOyaIndex].id;
+        roundState.oyaPlayerName = room.players[roundState.currentOyaIndex].name;
+        roundState.playerScores[roundState.currentOyaIndex].wasOya = true;
+
+        if (roundState.currentGameNumber > roundState.totalGames) {
+          roundState.isRoundComplete = true;
+          roomStore.setRoundState(roomId, roundState);
+          // 最終結果を表示（backToLobbyで待機画面に戻れる）
+          io.to(roomId).emit('game:roundComplete', { oyakoRoundState: roundState });
+          return;
+        }
+
+        roomStore.setRoundState(roomId, roundState);
+
+        // 新しいゲームを作成
+        const game = roomStore.createGame(roomId, roundState.currentOyaIndex);
+        game.setOyaPlayerId(roundState.oyaPlayerId);
+        game.setOyakoRoundState(roundState);
+
+        // 各プレイヤーに新しいゲーム状態を送信
+        for (const player of room.players) {
+          const playerSocket = io.sockets.sockets.get(player.id);
+          if (playerSocket) {
+            playerSocket.emit('game:started', { gameState: game.getStateForPlayer(player.id) });
+          }
+        }
+
+        console.log(`Next round game ${roundState.currentGameNumber}/${roundState.totalGames} in room: ${roomId}`);
+      } catch (error) {
+        socket.emit('game:error', {
+          message: error instanceof Error ? error.message : 'エラーが発生しました'
+        });
+      }
+    });
+
     // 待機画面に戻る
     socket.on('game:backToLobby', ({ roomId }) => {
       try {
@@ -532,6 +628,28 @@ app.prepare().then(() => {
         if (!room) {
           socket.emit('game:error', { message: '部屋が見つかりません' });
           return;
+        }
+
+        // 親子ルール: 最終ゲームの結果を累計に反映
+        if (room.oyakoRule) {
+          const roundState = roomStore.getRoundState(roomId);
+          const oldGame = roomStore.getGame(roomId);
+          if (roundState && oldGame) {
+            const { winners } = oldGame.getWinner();
+            const loser = oldGame.getLoser();
+            if (winners && winners.length > 0) {
+              const totalWinScore = winners.reduce((s, w) => s + w.finalScore, 0);
+              for (const winner of winners) {
+                const ps = roundState.playerScores.find(s => s.playerId === winner.playerId);
+                if (ps) ps.cumulativeScore += winner.finalScore;
+              }
+              if (loser) {
+                const ls = roundState.playerScores.find(s => s.playerId === loser.playerId);
+                if (ls) ls.cumulativeScore -= totalWinScore;
+              }
+            }
+          }
+          roomStore.clearRoundState(roomId);
         }
 
         // ゲームを削除して待機状態に戻す

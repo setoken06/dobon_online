@@ -34,6 +34,9 @@ export class GameManager {
   private rate: number;
   private minogashiPlayerName?: string; // 見逃し演出用
   private lastDrawCards: Card[] = [];
+  // 親子ルール関連
+  private oyaPlayerId?: string;
+  private oyakoRoundState?: import('../../src/types/game').OyakoRoundState;
   // ドボン返し関連
   private dobonGaeshiEligiblePlayerIds: Set<string> = new Set();
   private dobonTriggerPlayerId?: string;
@@ -61,7 +64,7 @@ export class GameManager {
   private colorChoicePlayerId?: string;
   private revealedLastDrawCount: number = 0; // ラストドローで公開済みカード数
 
-  constructor(roomId: string, players: Player[], jokerCount: number = 0, initialRate: number = 100, gameMode: GameMode = 'classic') {
+  constructor(roomId: string, players: Player[], jokerCount: number = 0, initialRate: number = 100, gameMode: GameMode = 'classic', startPlayerIndex?: number) {
     this.roomId = roomId;
     this.gameMode = gameMode;
     this.rate = initialRate;
@@ -83,8 +86,10 @@ export class GameManager {
       player.hand = this.deck.drawMultiple(GAME_CONFIG.initialHandSize);
     }
 
-    // ランダムに開始プレイヤーを決定
-    this.currentPlayerIndex = Math.floor(Math.random() * this.players.length);
+    // 開始プレイヤーを決定（親子ルール時は指定、通常はランダム）
+    this.currentPlayerIndex = startPlayerIndex !== undefined
+      ? startPlayerIndex
+      : Math.floor(Math.random() * this.players.length);
     const firstPlayer = this.players[this.currentPlayerIndex];
 
     // 場に1枚置く
@@ -527,6 +532,9 @@ export class GameManager {
       colorChoicePlayerId: this.colorChoicePlayerId,
       revealedLastDrawCount: this.dobonPhase === 'result' ? this.revealedLastDrawCount : undefined,
       minogashiPlayerName: this.minogashiPlayerName,
+      // 親子ルール関連
+      oyakoRoundState: this.oyakoRoundState,
+      oyaPlayerId: this.oyaPlayerId,
     };
   }
 
@@ -1138,7 +1146,9 @@ export class GameManager {
 
     if (this.pendingDobonIsGaeshi && this.pendingGaeshiTotalMultiplier !== undefined) {
       const gaeshiWinner = this.pendingDobonWinners[0];
-      const score = this.rate * lastDrawValue * this.pendingGaeshiTotalMultiplier;
+      const isOya = gaeshiWinner.playerId === this.oyaPlayerId;
+      const oyaMultiplier = isOya ? 1.5 : 1;
+      const score = this.rate * lastDrawValue * this.pendingGaeshiTotalMultiplier * oyaMultiplier;
       this.winners = [{
         playerId: gaeshiWinner.playerId,
         playerName: gaeshiWinner.playerName,
@@ -1146,17 +1156,21 @@ export class GameManager {
         finalScore: score,
         isDobonGaeshi: true,
         gaeshiMultiplier: this.pendingGaeshiTotalMultiplier,
+        isOya,
       }];
     } else {
       this.winners = [];
       for (const dobonInfo of this.pendingDobonWinners) {
         const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
-        const score = this.rate * lastDrawValue * handCountMultiplier;
+        const isOya = dobonInfo.playerId === this.oyaPlayerId;
+        const oyaMultiplier = isOya ? 1.5 : 1;
+        const score = this.rate * lastDrawValue * handCountMultiplier * oyaMultiplier;
         this.winners.push({
           playerId: dobonInfo.playerId,
           playerName: dobonInfo.playerName,
           handCount: dobonInfo.handCount,
           finalScore: score,
+          isOya,
         });
       }
     }
@@ -1266,6 +1280,18 @@ export class GameManager {
 
   isWaitingForInitialRateConfirm(): boolean {
     return this.waitingForInitialRateConfirm;
+  }
+
+  setOyaPlayerId(playerId: string): void {
+    this.oyaPlayerId = playerId;
+  }
+
+  setOyakoRoundState(state: import('../../src/types/game').OyakoRoundState): void {
+    this.oyakoRoundState = state;
+  }
+
+  getLoser(): import('../../src/types/game').LoserInfo | undefined {
+    return this.loser;
   }
 
   // 再接続時にプレイヤーIDを更新

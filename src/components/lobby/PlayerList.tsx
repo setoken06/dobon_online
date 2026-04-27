@@ -26,6 +26,9 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
             モード: <span className={`font-semibold ${room.gameMode === 'uno' ? 'text-orange-600' : 'text-blue-600'}`}>
               {room.gameMode === 'uno' ? 'UNO' : 'クラシック'}
             </span>
+            {room.oyakoRule && (
+              <span className="ml-2 text-purple-600 font-semibold">親子ルール ON</span>
+            )}
           </p>
         </div>
 

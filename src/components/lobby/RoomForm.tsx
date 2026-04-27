@@ -16,7 +16,7 @@ const STORAGE_KEYS = {
 const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
 
 interface RoomFormProps {
-  onCreateRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode: GameMode) => void;
+  onCreateRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode: GameMode, oyakoRule?: boolean) => void;
   onJoinRoom: (roomId: string, playerName: string, myMark: Suit) => void;
   error: string | null;
   onClearError: () => void;
@@ -30,6 +30,7 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
   const [rate, setRate] = useState(DEFAULT_ROOM_CONFIG.rate);
   const [myMark, setMyMark] = useState<Suit>('hearts');
   const [gameMode, setGameMode] = useState<GameMode>(DEFAULT_ROOM_CONFIG.gameMode);
+  const [oyakoRule, setOyakoRule] = useState(false);
 
   // ローカルストレージから読み込み
   useEffect(() => {
@@ -109,7 +110,7 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
     }
 
     if (mode === 'create') {
-      onCreateRoom(roomId, playerName.trim(), jokerCount, rate, myMark, gameMode);
+      onCreateRoom(roomId, playerName.trim(), jokerCount, rate, myMark, gameMode, oyakoRule);
     } else if (mode === 'join') {
       onJoinRoom(roomId, playerName.trim(), myMark);
     }
@@ -287,6 +288,24 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">EVJ</span>
                 </div>
+              </div>
+
+              {/* 親子ルール */}
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div
+                    onClick={() => setOyakoRule(!oyakoRule)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      oyakoRule ? 'bg-purple-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                      oyakoRule ? 'translate-x-6' : ''
+                    }`} />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">親子ルール</span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1">全員が親を1回ずつ務める。親が勝つとスコア1.5倍</p>
               </div>
             </>
           )}
