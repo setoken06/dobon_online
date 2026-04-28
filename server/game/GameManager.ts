@@ -999,9 +999,21 @@ export class GameManager {
     this.playersWhoSkippedDobon.add(playerId);
     this.dobonablePlayerIds.delete(playerId);
 
-    // 見逃し: レート2倍
+    // 見逃し: レート2倍 + 他プレイヤー全員がカード2枚引く
     this.rate *= 2;
     this.minogashiPlayerName = player?.playerName;
+
+    this.refillDeckIfNeeded();
+    for (const p of this.players) {
+      if (p.playerId === playerId) continue;
+      for (let i = 0; i < 2; i++) {
+        this.refillDeckIfNeeded();
+        const card = this.deck.draw();
+        if (card) p.hand.push(card);
+      }
+      // リーチ状態を再判定
+      p.isReach = this.checkReachCondition(p.hand);
+    }
 
     if (this.dobonablePlayerIds.size === 0) {
       return this.resolveDobonPhase();
