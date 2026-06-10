@@ -36,6 +36,7 @@ export class GameManager {
   private playersWhoEverSkippedDobon: Set<string> = new Set();
   private rate: number;
   private minogashiPlayerName?: string; // 見逃し演出用
+  private minogashiRateApplied?: boolean; // 直近の見逃しでレート×2が適用されたか
   private lastDrawCards: Card[] = [];
   // 親子ルール関連
   private oyaPlayerId?: string;
@@ -535,6 +536,7 @@ export class GameManager {
       colorChoicePlayerId: this.colorChoicePlayerId,
       revealedLastDrawCount: this.dobonPhase === 'result' ? this.revealedLastDrawCount : undefined,
       minogashiPlayerName: this.minogashiPlayerName,
+      minogashiRateApplied: this.minogashiRateApplied,
       // 親子ルール関連
       oyakoRoundState: this.oyakoRoundState,
       oyaPlayerId: this.oyaPlayerId,
@@ -1015,23 +1017,17 @@ export class GameManager {
     this.playersWhoSkippedDobon.add(playerId);
     this.dobonablePlayerIds.delete(playerId);
 
-    // 見逃し: 全員がカード2枚引く（見逃した本人含む）
-    // レート×2は「このプレイヤーがこのゲームで初めての見逃し」の時だけ適用
+    // 見逃しの効果は「このプレイヤーがこのゲームで初めての見逃し」の時だけ適用
+    // - 1回目: レート×2 + 見逃し演出
+    // - 2回目以降: 何も起きない（演出も発生せず、他プレイヤーから見ても判別不可）
+    // 2ドローは新仕様で廃止
     const isFirstSkipForPlayer = !this.playersWhoEverSkippedDobon.has(playerId);
     this.playersWhoEverSkippedDobon.add(playerId);
+
     if (isFirstSkipForPlayer) {
       this.rate *= 2;
-    }
-    this.minogashiPlayerName = player?.playerName;
-
-    for (const p of this.players) {
-      for (let i = 0; i < 2; i++) {
-        this.refillDeckIfNeeded();
-        const card = this.deck.draw();
-        if (card) p.hand.push(card);
-      }
-      // リーチ状態を再判定
-      p.isReach = this.checkReachCondition(p.hand);
+      this.minogashiPlayerName = player?.playerName;
+      this.minogashiRateApplied = true;
     }
 
     if (this.dobonablePlayerIds.size === 0) {

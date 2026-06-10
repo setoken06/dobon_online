@@ -129,7 +129,7 @@ export function GameBoard({
     }
   }, [gameState.dobonPhase]);
 
-  // 見逃し演出（ドボンスキップでレート2倍）
+  // 見逃し演出（初回見逃しのみ発動 / 2回目以降はサーバー側で演出フラグを立てない）
   const [minogashiText, setMinogashiText] = useState<string | null>(null);
   const minogashiTimerRef = useRef<NodeJS.Timeout | null>(null);
   const prevMinogashiRef = useRef<string | undefined>(undefined);
@@ -506,7 +506,7 @@ export function GameBoard({
         </div>
       )}
 
-      {/* 見逃し演出オーバーレイ */}
+      {/* 見逃し演出オーバーレイ（初回見逃しのみ表示） */}
       {minogashiText && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
           <div className="animate-bounce">
