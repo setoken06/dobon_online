@@ -31,6 +31,9 @@ export class GameManager {
   private dobonablePlayerIds: Set<string> = new Set();
   private playersWhoDoboned: Map<string, DobonPlayerInfo> = new Map();
   private playersWhoSkippedDobon: Set<string> = new Set();
+  // ゲーム全体を通して見逃しを1回以上した経験のあるプレイヤー
+  // 最初の見逃しのみレート×2が適用される（2回目以降は2ドローのみで倍率変動なし）
+  private playersWhoEverSkippedDobon: Set<string> = new Set();
   private rate: number;
   private minogashiPlayerName?: string; // 見逃し演出用
   private lastDrawCards: Card[] = [];
@@ -909,12 +912,23 @@ export class GameManager {
           if (this.checkDobonConditionForSpecial(playerId, effectiveCard)) {
             this.dobonablePlayerIds.add(playerId);
             this.isTsumoDobon = true;
+            // ツモドボン成立時、オナニー（loser=自分）でなければ
+            // 前回ディスカード者をドボン返し候補に設定（既存gaeshi判定に乗せる）
+            if (this.lastDiscardPlayerId && this.lastDiscardPlayerId !== playerId) {
+              this.dobonTriggerPlayerId = this.lastDiscardPlayerId;
+              this.dobonCardValue = 0; // UNO特殊カード時はtopCardから再判定するため値は未使用
+            }
           }
         } else {
           const topCardValue = this.getCardValue(effectiveCard);
           if (this.checkDobonCondition(playerId, topCardValue)) {
             this.dobonablePlayerIds.add(playerId);
             this.isTsumoDobon = true;
+            // 同上（オナニー除外）
+            if (this.lastDiscardPlayerId && this.lastDiscardPlayerId !== playerId) {
+              this.dobonTriggerPlayerId = this.lastDiscardPlayerId;
+              this.dobonCardValue = topCardValue;
+            }
           }
         }
       }
@@ -989,7 +1003,9 @@ export class GameManager {
     return { success: true, allResponded: false };
   }
 
-  // ドボンをスキップ（見逃し: レート2倍）
+  // ドボンをスキップ（見逃し）
+  // 1ゲームにつき各プレイヤー1回目の見逃しのみレート×2、2回目以降はレート据え置き
+  // 2ドロー（全員）は毎回適用
   skipDobon(playerId: string): { success: boolean; error?: string; allResponded?: boolean } {
     if (!this.dobonablePlayerIds.has(playerId)) {
       return { success: false, error: 'ドボンの権利がありません' };
@@ -999,8 +1015,13 @@ export class GameManager {
     this.playersWhoSkippedDobon.add(playerId);
     this.dobonablePlayerIds.delete(playerId);
 
-    // 見逃し: レート2倍 + 全員がカード2枚引く（見逃した本人含む）
-    this.rate *= 2;
+    // 見逃し: 全員がカード2枚引く（見逃した本人含む）
+    // レート×2は「このプレイヤーがこのゲームで初めての見逃し」の時だけ適用
+    const isFirstSkipForPlayer = !this.playersWhoEverSkippedDobon.has(playerId);
+    this.playersWhoEverSkippedDobon.add(playerId);
+    if (isFirstSkipForPlayer) {
+      this.rate *= 2;
+    }
     this.minogashiPlayerName = player?.playerName;
 
     for (const p of this.players) {
@@ -1210,9 +1231,10 @@ export class GameManager {
       return { success: false, error: 'プレイヤーが見つかりません' };
     }
 
-    let totalMultiplier = this.getHandCountMultiplier(player.hand.length);
+    // ドボン返し倍率は「自分と原ドボン宣言者全員の手札枚数」を単純加算する
+    let totalMultiplier = player.hand.length;
     for (const [, dobonInfo] of this.playersWhoDoboned) {
-      totalMultiplier += this.getHandCountMultiplier(dobonInfo.handCount);
+      totalMultiplier += dobonInfo.handCount;
     }
 
     this.dobonGaeshiEligiblePlayerIds.clear();
