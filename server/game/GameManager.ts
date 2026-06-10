@@ -525,6 +525,10 @@ export class GameManager {
       isWaitingForDobon: this.dobonablePlayerIds.has(playerId),
       isWaitingForDobonGaeshi: this.dobonGaeshiEligiblePlayerIds.has(playerId),
       isAnyoneDecidingDobon: this.dobonablePlayerIds.size > 0 || this.dobonGaeshiEligiblePlayerIds.size > 0,
+      // ターン表示のドボン透けバグ対策: サーバー側で算出する表示用ターンID
+      // - 通常ドボン判定中（カレントプレイヤー以外がドボン可能 or ガエシ待ち）→ 次プレイヤーに進める
+      // - ツモドボン判定中（カレントプレイヤー自身がドボン可能）→ 表示も実際のまま据え置く
+      displayCurrentPlayerId: this.computeDisplayCurrentPlayerId(),
       dobonPhase: this.dobonPhase,
       dobonWinnerPlayerIds,
       isDobonGaeshi: this.dobonPhase ? this.pendingDobonIsGaeshi : undefined,
@@ -541,6 +545,22 @@ export class GameManager {
       oyakoRoundState: this.oyakoRoundState,
       oyaPlayerId: this.oyaPlayerId,
     };
+  }
+
+  // 表示用ターンIDを算出（ドボン透けバグ対策）
+  // 通常ドボン or ガエシ待ち中だけ表示を次プレイヤーに進める。
+  // ツモドボン中はカレントプレイヤー自身がドボン候補なので、表示を進めない（他プレイヤー視点での透け防止）
+  private computeDisplayCurrentPlayerId(): string {
+    const currentId = this.getCurrentPlayer().playerId;
+    const isCurrentSelfDobonable = this.dobonablePlayerIds.has(currentId);
+    const isNormalDobonPending = this.dobonablePlayerIds.size > 0 && !isCurrentSelfDobonable;
+    const isGaeshiPending = this.dobonGaeshiEligiblePlayerIds.size > 0;
+    if (!isNormalDobonPending && !isGaeshiPending) {
+      return currentId;
+    }
+    const len = this.players.length;
+    const nextIdx = ((this.currentPlayerIndex + this.turnDirection) % len + len) % len;
+    return this.players[nextIdx].playerId;
   }
 
   // 出せるカードを取得

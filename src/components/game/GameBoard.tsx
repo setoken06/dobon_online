@@ -56,18 +56,10 @@ export function GameBoard({
   const isFinished = gameState.status === 'finished';
 
   // ターン表示のリーク対策：
-  // ドボン判定中（isAnyoneDecidingDobon）は実際のターンはカードを出したプレイヤーのままだが、
-  // 表示上は次のプレイヤーのターンとして見せる（ドボン可能状態を悟られない）。
+  // サーバー側が算出した displayCurrentPlayerId を使用（ツモドボンの透けも回避）。
+  // 後方互換のため未設定時は currentPlayerId にフォールバック。
   // ※ isMyTurn は内部ロジック（操作可否）用なのでそのまま据え置く。
-  const displayCurrentPlayerId = (() => {
-    if (!gameState.isAnyoneDecidingDobon) return gameState.currentPlayerId;
-    const idx = gameState.players.findIndex(p => p.playerId === gameState.currentPlayerId);
-    if (idx < 0) return gameState.currentPlayerId;
-    const direction = gameState.turnDirection ?? 1;
-    const len = gameState.players.length;
-    const nextIdx = ((idx + direction) % len + len) % len;
-    return gameState.players[nextIdx].playerId;
-  })();
+  const displayCurrentPlayerId = gameState.displayCurrentPlayerId ?? gameState.currentPlayerId;
   const isDisplayMyTurn = displayCurrentPlayerId === playerId;
   const displayCurrentPlayerName = gameState.players.find(p => p.playerId === displayCurrentPlayerId)?.playerName;
   // 複数勝者対応：winnersに自分が含まれているか、または単独勝者が自分か

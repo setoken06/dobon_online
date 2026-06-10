@@ -87,6 +87,7 @@ export interface GameState {
   revealedLastDrawCount?: number;           // ラストドローで公開済みのカード数
   minogashiPlayerName?: string;             // 見逃し演出（ドボンスキップ時の演出）
   minogashiRateApplied?: boolean;           // 今回の見逃しでレート×2が適用されたか（初回のみtrue）
+  displayCurrentPlayerId?: string;          // ターン表示用のプレイヤーID（ドボン透け対策のため実際のcurrentPlayerIdと異なる場合あり）
   // 親子ルール関連
   oyakoRoundState?: OyakoRoundState;        // 親子ルールのラウンド状態
   oyaPlayerId?: string;                     // 現在の親のプレイヤーID
