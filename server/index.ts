@@ -473,8 +473,15 @@ app.prepare().then(() => {
         if (game.isGameOver()) {
           const { winnerId, winnerName } = game.getWinner();
           if (winnerId && winnerName) {
+            // 対戦履歴を記録（セッション内のみ、永続化なし）
+            roomStore.recordGameHistory(roomId, game);
             io.to(roomId).emit('game:finished', { winnerId, winnerName });
             roomStore.setRoomStatus(roomId, 'finished');
+            // 更新された履歴を含む部屋情報をブロードキャスト
+            const updatedRoom = roomStore.getRoom(roomId);
+            if (updatedRoom) {
+              io.to(roomId).emit('room:updated', { room: updatedRoom });
+            }
           }
         }
       } catch (error) {

@@ -1,4 +1,4 @@
-import { Room, Player, DEFAULT_ROOM_CONFIG } from '../../src/types/room';
+import { Room, Player, DEFAULT_ROOM_CONFIG, GameHistoryEntry } from '../../src/types/room';
 import { GameManager } from '../game/GameManager';
 import { GameMode } from '../../src/types/card';
 import { OyakoRoundState } from '../../src/types/game';
@@ -122,6 +122,29 @@ export class RoomStore {
     this.rooms.delete(roomId);
     this.games.delete(roomId);
     this.roundStates.delete(roomId);
+  }
+
+  // 対戦履歴を記録（メモリ上のみ、部屋削除で消失）
+  recordGameHistory(roomId: string, game: GameManager): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    const winnerInfo = game.getWinner();
+    const winners = winnerInfo.winners;
+    if (!winners || winners.length === 0) return;
+    const loser = game.getLoser();
+    const totalScore = winners.reduce((s, w) => s + w.finalScore, 0);
+    const isOnanii = !!(loser?.isTsumoDobon && winners.length > 0 && loser.playerId === winners[0].playerId);
+    const entry: GameHistoryEntry = {
+      winners: winners.map(w => ({ playerName: w.playerName, score: w.finalScore })),
+      loserName: loser?.playerName ?? null,
+      totalScore,
+      timestamp: Date.now(),
+      isDobonGaeshi: winners.some(w => w.isDobonGaeshi),
+      isWorst: winners.some(w => w.isWorst),
+      isOnanii,
+    };
+    if (!room.gameHistory) room.gameHistory = [];
+    room.gameHistory.push(entry);
   }
 
   // セッションIDでプレイヤーを検索

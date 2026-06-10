@@ -54,6 +54,22 @@ export function GameBoard({
   const opponents = gameState.players.filter((p) => p.playerId !== playerId);
   const isMyTurn = gameState.currentPlayerId === playerId;
   const isFinished = gameState.status === 'finished';
+
+  // ターン表示のリーク対策：
+  // ドボン判定中（isAnyoneDecidingDobon）は実際のターンはカードを出したプレイヤーのままだが、
+  // 表示上は次のプレイヤーのターンとして見せる（ドボン可能状態を悟られない）。
+  // ※ isMyTurn は内部ロジック（操作可否）用なのでそのまま据え置く。
+  const displayCurrentPlayerId = (() => {
+    if (!gameState.isAnyoneDecidingDobon) return gameState.currentPlayerId;
+    const idx = gameState.players.findIndex(p => p.playerId === gameState.currentPlayerId);
+    if (idx < 0) return gameState.currentPlayerId;
+    const direction = gameState.turnDirection ?? 1;
+    const len = gameState.players.length;
+    const nextIdx = ((idx + direction) % len + len) % len;
+    return gameState.players[nextIdx].playerId;
+  })();
+  const isDisplayMyTurn = displayCurrentPlayerId === playerId;
+  const displayCurrentPlayerName = gameState.players.find(p => p.playerId === displayCurrentPlayerId)?.playerName;
   // 複数勝者対応：winnersに自分が含まれているか、または単独勝者が自分か
   const isWinner = gameState.winners
     ? gameState.winners.some(w => w.playerId === playerId)
@@ -301,13 +317,13 @@ export function GameBoard({
 
       {/* スマホ用: ターン + レート表示（横並び） */}
       <div className="md:hidden flex justify-between items-center mb-2">
-        {isMyTurn ? (
+        {isDisplayMyTurn ? (
           <div className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full font-bold text-sm animate-pulse">
             あなたのターン
           </div>
         ) : (
           <div className="bg-gray-600 text-white px-3 py-1 rounded-full font-medium text-sm">
-            {gameState.players.find((p) => p.playerId === gameState.currentPlayerId)?.playerName} のターン
+            {displayCurrentPlayerName} のターン
           </div>
         )}
         <div className="flex gap-1 items-center">
@@ -680,13 +696,13 @@ export function GameBoard({
 
       {/* ターン表示（PC用・中央配置） */}
       <div className="hidden md:block text-center mb-4">
-        {isMyTurn ? (
+        {isDisplayMyTurn ? (
           <div className="inline-block bg-yellow-400 text-yellow-900 px-6 py-2 rounded-full font-bold text-lg animate-pulse">
             あなたのターン
           </div>
         ) : (
           <div className="inline-block bg-gray-600 text-white px-6 py-2 rounded-full font-medium">
-            {gameState.players.find((p) => p.playerId === gameState.currentPlayerId)?.playerName} のターン
+            {displayCurrentPlayerName} のターン
           </div>
         )}
       </div>
@@ -697,7 +713,7 @@ export function GameBoard({
           <OpponentHand
             key={opponent.playerId}
             player={opponent}
-            isCurrentTurn={gameState.currentPlayerId === opponent.playerId}
+            isCurrentTurn={displayCurrentPlayerId === opponent.playerId}
             isDisconnected={disconnectedPlayers.has(opponent.playerId)}
           />
         ))}

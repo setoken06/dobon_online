@@ -79,6 +79,49 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
           </p>
         )}
 
+        {/* セッション内の対戦履歴（このルームが残っている間のみ保持） */}
+        {room.gameHistory && room.gameHistory.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-3">
+              対戦履歴 ({room.gameHistory.length}戦)
+            </h3>
+            <div className="bg-gray-50 rounded-lg p-3 max-h-64 overflow-y-auto space-y-1.5">
+              {[...room.gameHistory].reverse().map((entry, i) => {
+                const winnerNames = entry.winners.map(w => w.playerName).join(', ');
+                const scoreStr = entry.totalScore.toLocaleString();
+                const isPositive = entry.totalScore > 0;
+                const isNegative = entry.totalScore < 0;
+                return (
+                  <div
+                    key={room.gameHistory!.length - i - 1}
+                    className="flex items-center justify-between gap-2 px-3 py-1.5 bg-white rounded text-sm border border-gray-200"
+                  >
+                    <span className="text-gray-700 truncate flex-1">
+                      <span className={`font-semibold ${entry.isWorst ? 'text-red-600' : isPositive ? 'text-green-600' : 'text-gray-600'}`}>
+                        {winnerNames}
+                      </span>
+                      <span className="mx-1 text-gray-400">→</span>
+                      <span className="text-gray-700">{entry.loserName ?? '—'}</span>
+                    </span>
+                    <span className={`font-bold whitespace-nowrap ${
+                      entry.isWorst ? 'text-red-600' :
+                      isPositive ? 'text-orange-600' :
+                      isNegative ? 'text-red-500' : 'text-gray-500'
+                    }`}>
+                      {isPositive ? '+' : ''}{scoreStr} EVJ
+                    </span>
+                    <span className="flex gap-1 text-xs">
+                      {entry.isDobonGaeshi && <span title="ドボン返し">🔄</span>}
+                      {entry.isWorst && <span title="ワースト">💀</span>}
+                      {entry.isOnanii && <span title="オナニー">🎊</span>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
           {isHost && (
             <button
