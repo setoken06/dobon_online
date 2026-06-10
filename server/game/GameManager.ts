@@ -1300,7 +1300,17 @@ export class GameManager {
   private performLastDraw(): void {
     this.lastDrawCards = [];
 
-    this.refillDeckIfNeeded();
+    // ラストドロー専用の積極的リフィル: ゲーム終了処理なのでトップカード温存は不要
+    // → 山札が空なら捨て札を全部山札へ（discardPileに1枚しかない場合でも取り込む）
+    const refillForLastDraw = () => {
+      if (this.deck.isEmpty() && this.discardPile.length > 0) {
+        this.deck.addCards(this.discardPile);
+        this.discardPile = [];
+        this.deck.shuffle();
+      }
+    };
+
+    refillForLastDraw();
 
     let lastDrawCard = this.deck.draw();
     while (lastDrawCard) {
@@ -1311,11 +1321,17 @@ export class GameManager {
       if (isJokerLike) {
         // ジョーカー/ワイルドならレート*2してもう一枚引く
         this.rate *= 2;
-        this.refillDeckIfNeeded();
+        refillForLastDraw();
         lastDrawCard = this.deck.draw();
       } else {
         break;
       }
+    }
+
+    // フォールバック: 山札も捨て札も全て手札にあって空のまま終わった場合、
+    // dobonTriggerCard を最終札として使う（UIの進行不能を防ぐ）
+    if (this.lastDrawCards.length === 0 && this.dobonTriggerCard) {
+      this.lastDrawCards.push(this.dobonTriggerCard);
     }
   }
 
