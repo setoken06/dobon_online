@@ -1,26 +1,121 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Dobon Online — Modern Minimal Design System
+   ============================================================ */
+@theme {
+  /* canvas / surfaces */
+  --color-canvas: #f3f4f6;
+  --color-surface: #ffffff;
+  --color-surface-2: #f8f9fb;
+
+  /* ink (text) */
+  --color-ink: #15171c;
+  --color-ink-soft: #41454d;
+  --color-muted: #8b9099;
+
+  /* hairlines */
+  --color-line: #e7e9ee;
+  --color-line-soft: #f0f1f4;
+
+  /* single accent (emerald) used sparingly */
+  --color-accent: #0f9d76;
+  --color-accent-ink: #0a7d5e;
+  --color-accent-soft: #e8f6f1;
+
+  /* semantic */
+  --color-danger: #e0484d;
+  --color-danger-soft: #fdecec;
+  --color-gold: #ad8746;
+
+  /* play surface (table) — dark minimal for focus + card contrast */
+  --color-felt: #14181e;
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--color-line);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+
+/* ---- Canvas backgrounds ---- */
+.app-bg {
+  background:
+    radial-gradient(120% 80% at 50% -10%, #ffffff 0%, var(--color-canvas) 55%, #eceef1 100%);
+}
+
+/* Dark minimal table surface for the game board.
+   Dots are layered ON TOP of the dark radial gradient (first layer = topmost). */
+.felt-bg {
+  background-color: #14181e;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    radial-gradient(140% 100% at 50% 0%, #1d242c 0%, #14181e 55%, #0d1015 100%);
+  background-size: 22px 22px, cover;
+  background-position: 0 0, center;
+}
+
+/* standalone faint dotted texture (kept for reuse; do not combine with .felt-bg) */
+.dot-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ---- Elevation ---- */
+.elev-sm {
+  box-shadow: 0 1px 2px rgba(20, 24, 30, 0.04), 0 1px 3px rgba(20, 24, 30, 0.06);
+}
+.elev {
+  box-shadow: 0 2px 4px rgba(20, 24, 30, 0.04), 0 8px 24px rgba(20, 24, 30, 0.08);
+}
+.elev-lg {
+  box-shadow: 0 4px 8px rgba(20, 24, 30, 0.06), 0 24px 48px rgba(20, 24, 30, 0.14);
+}
+
+/* card / chip face shadow on dark felt */
+.card-shadow {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 6px 16px rgba(0, 0, 0, 0.28);
+}
+
+/* ---- Animations ---- */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.85); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@keyframes announcePulse {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes softGlow {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.anim-fade-up { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-pop { animation: popIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-glow { animation: softGlow 1.8s ease-in-out infinite; }
+
+/* thin custom scrollbars inside panels */
+.scroll-soft::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-soft::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 999px; }
+.scroll-soft::-webkit-scrollbar-track { background: transparent; }

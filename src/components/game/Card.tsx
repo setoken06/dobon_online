@@ -11,11 +11,18 @@ interface CardProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-const UNO_COLOR_CLASSES: Record<UnoColor, { bg: string; border: string; text: string }> = {
-  red: { bg: 'bg-red-500', border: 'border-red-700', text: 'text-white' },
-  blue: { bg: 'bg-blue-500', border: 'border-blue-700', text: 'text-white' },
-  yellow: { bg: 'bg-yellow-400', border: 'border-yellow-600', text: 'text-gray-900' },
-  green: { bg: 'bg-green-500', border: 'border-green-700', text: 'text-white' },
+const UNO_COLOR_CLASSES: Record<UnoColor, { bg: string; text: string }> = {
+  red: { bg: 'bg-[#e0484d]', text: 'text-white' },
+  blue: { bg: 'bg-[#3b82c4]', text: 'text-white' },
+  yellow: { bg: 'bg-[#e3b53b]', text: 'text-[#15171c]' },
+  green: { bg: 'bg-[#3fa07a]', text: 'text-white' },
+};
+
+const SIZES = {
+  sm: { box: 'w-12 h-[68px] rounded-md', corner: 'text-[10px]', pip: 'text-xl', center: 'text-xl' },
+  md: { box: 'w-16 h-[92px] rounded-lg', corner: 'text-xs', pip: 'text-2xl', center: 'text-2xl' },
+  lg: { box: 'w-20 h-28 rounded-xl', corner: 'text-sm', pip: 'text-3xl', center: 'text-3xl' },
+  xl: { box: 'w-40 h-56 rounded-2xl', corner: 'text-lg', pip: 'text-6xl', center: 'text-6xl' },
 };
 
 export function Card({
@@ -31,107 +38,69 @@ export function Card({
   const isUnoSpecial = isUnoSpecialCard(card);
   const isUnoColor = card.suit in UNO_COLOR_CLASSES;
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
+  const s = SIZES[size];
 
-  const sizeClasses = {
-    sm: 'w-12 h-16 text-sm',
-    md: 'w-16 h-24 text-lg',
-    lg: 'w-20 h-28 text-xl',
-    xl: 'w-40 h-56 text-4xl',
-  };
+  // shared interaction layer
+  const interaction = [
+    'relative flex flex-col card-shadow transition-all duration-200 ease-out select-none',
+    s.box,
+    selected ? '-translate-y-3 ring-2 ring-[var(--color-accent)] z-10' : '',
+    playable && !disabled ? 'cursor-pointer hover:-translate-y-1.5' : '',
+    disabled ? 'opacity-55 cursor-not-allowed' : '',
+    !playable && !disabled ? 'cursor-default' : '',
+  ].join(' ');
 
-  // ワイルドカード（UNOモード）
+  // Wild card (UNO)
   if (isWild) {
     const isW4 = card.isWild4;
     return (
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={`
-          ${sizeClasses[size]}
-          bg-gradient-to-br ${isW4 ? 'from-red-500 via-blue-500 to-green-500' : 'from-purple-500 to-pink-500'} rounded-lg border-2 shadow-md
-          flex flex-col items-center justify-center
-          transition-all duration-200
-          text-white
-          ${selected ? 'border-yellow-400 ring-2 ring-yellow-400 transform -translate-y-2' : 'border-gray-700'}
-          ${playable && !disabled ? 'hover:border-yellow-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer' : ''}
-          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-        `}
-      >
-        <span className="text-xs font-bold">{isW4 ? '+4' : ''}</span>
-        <span className="text-2xl">🌈</span>
-        <span className="text-xs font-bold">WILD</span>
+      <button onClick={onClick} disabled={disabled} className={`${interaction} items-center justify-center overflow-hidden bg-[#1b1f27] border border-white/10`}>
+        <div className={`absolute inset-0 opacity-90 ${isW4 ? 'bg-[conic-gradient(at_50%_50%,#e0484d,#e3b53b,#3fa07a,#3b82c4,#e0484d)]' : 'bg-[conic-gradient(at_50%_50%,#e0484d,#e3b53b,#3fa07a,#3b82c4,#e0484d)]'}`} />
+        <div className="absolute inset-[3px] rounded-[inherit] bg-[#15181f]/85 backdrop-blur-[1px]" />
+        <span className="relative text-white font-semibold tracking-wide" style={{ fontSize: size === 'xl' ? '1.5rem' : '0.7rem' }}>WILD</span>
+        {isW4 && <span className="relative text-white/90 font-bold mt-0.5" style={{ fontSize: size === 'xl' ? '2rem' : '0.85rem' }}>+4</span>}
       </button>
     );
   }
 
-  // ジョーカー（クラシックモード）
+  // Joker (classic)
   if (isJoker) {
     return (
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={`
-          ${sizeClasses[size]}
-          bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg border-2 shadow-md
-          flex flex-col items-center justify-center
-          transition-all duration-200
-          text-white
-          ${selected ? 'border-yellow-400 ring-2 ring-yellow-400 transform -translate-y-2' : 'border-purple-700'}
-          ${playable && !disabled ? 'hover:border-yellow-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer' : ''}
-          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-        `}
-      >
-        <span className="text-3xl">🃏</span>
+      <button onClick={onClick} disabled={disabled} className={`${interaction} items-center justify-center bg-gradient-to-br from-[#1f2430] to-[#11141b] border border-white/10`}>
+        <span className={s.center}>🃏</span>
+        <span className="absolute bottom-1.5 text-[9px] tracking-[0.2em] text-white/50 font-medium">JOKER</span>
       </button>
     );
   }
 
-  // UNOカード（色付き）
+  // UNO colored card
   if (isUnoColor) {
     const colorClass = UNO_COLOR_CLASSES[card.suit as UnoColor];
-    const displayText = isUnoSpecial
-      ? UNO_SPECIAL_LABELS[card.unoSpecial!]
-      : String(card.rank);
-
+    const displayText = isUnoSpecial ? UNO_SPECIAL_LABELS[card.unoSpecial!] : String(card.rank);
     return (
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={`
-          ${sizeClasses[size]}
-          ${colorClass.bg} rounded-lg border-2 shadow-md
-          flex flex-col items-center justify-center
-          transition-all duration-200
-          ${colorClass.text}
-          ${selected ? 'border-yellow-400 ring-2 ring-yellow-400 transform -translate-y-2' : colorClass.border}
-          ${playable && !disabled ? 'hover:border-yellow-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer' : ''}
-          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-        `}
-      >
-        <span className="font-bold text-xl">{displayText}</span>
+      <button onClick={onClick} disabled={disabled} className={`${interaction} ${colorClass.bg} ${colorClass.text} items-center justify-center border border-black/10`}>
+        <span className={`absolute top-1 left-1.5 font-bold ${s.corner}`}>{displayText}</span>
+        <span className={`font-extrabold ${s.center}`}>{displayText}</span>
+        <span className={`absolute bottom-1 right-1.5 font-bold rotate-180 ${s.corner}`}>{displayText}</span>
       </button>
     );
   }
 
-  // クラシックカード
+  // Classic playing card — minimal index + center pip
+  const ink = isRed ? 'text-[#d8434a]' : 'text-[#1a1d23]';
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`
-        ${sizeClasses[size]}
-        bg-white rounded-lg border-2 shadow-md
-        flex flex-col items-center justify-center
-        transition-all duration-200
-        ${isRed ? 'text-red-600' : 'text-gray-900'}
-        ${selected ? 'border-yellow-400 ring-2 ring-yellow-400 transform -translate-y-2' : 'border-gray-300'}
-        ${playable && !disabled ? 'hover:border-green-500 hover:shadow-lg hover:-translate-y-1 cursor-pointer' : ''}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-        ${!playable && !disabled ? 'hover:border-gray-400' : ''}
-      `}
-    >
-      <span className="font-bold">{RANK_LABELS[card.rank]}</span>
-      <span className="text-2xl">{SUIT_SYMBOLS[card.suit]}</span>
+    <button onClick={onClick} disabled={disabled} className={`${interaction} bg-white border border-[#e2e4e9] ${ink} ${playable && !disabled ? 'hover:border-[var(--color-accent)]' : ''}`}>
+      <div className={`absolute top-1 left-1.5 flex flex-col items-center leading-none ${s.corner}`}>
+        <span className="font-bold">{RANK_LABELS[card.rank]}</span>
+        <span className="font-medium">{SUIT_SYMBOLS[card.suit]}</span>
+      </div>
+      <div className="flex-1 flex items-center justify-center">
+        <span className={s.center}>{SUIT_SYMBOLS[card.suit]}</span>
+      </div>
+      <div className={`absolute bottom-1 right-1.5 flex flex-col items-center leading-none rotate-180 ${s.corner}`}>
+        <span className="font-bold">{RANK_LABELS[card.rank]}</span>
+        <span className="font-medium">{SUIT_SYMBOLS[card.suit]}</span>
+      </div>
     </button>
   );
 }
@@ -141,24 +110,10 @@ interface CardBackProps {
 }
 
 export function CardBack({ size = 'md' }: CardBackProps) {
-  const sizeClasses = {
-    sm: 'w-12 h-16',
-    md: 'w-16 h-24',
-    lg: 'w-20 h-28',
-    xl: 'w-40 h-56',
-  };
-
+  const s = SIZES[size];
   return (
-    <div
-      className={`
-        ${sizeClasses[size]}
-        bg-blue-800 rounded-lg border-2 border-blue-900 shadow-md
-        flex items-center justify-center
-      `}
-    >
-      <div className="w-3/4 h-3/4 bg-blue-700 rounded border border-blue-600 flex items-center justify-center">
-        <span className="text-blue-400 text-2xl">?</span>
-      </div>
+    <div className={`${s.box} card-shadow bg-gradient-to-br from-[#222834] to-[#161a22] border border-white/10 flex items-center justify-center overflow-hidden`}>
+      <span className="text-white/25 font-bold tracking-tight" style={{ fontSize: size === 'sm' ? '0.8rem' : '1.25rem' }}>♠</span>
     </div>
   );
 }

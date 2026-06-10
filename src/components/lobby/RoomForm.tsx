@@ -124,134 +124,145 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
 
   if (mode === 'select') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-green-900 p-4">
-        <h1 className="text-4xl font-bold text-white mb-8">Dobon Online</h1>
-        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-          <div className="space-y-4">
-            <button
-              onClick={() => setMode('create')}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white text-xl font-semibold rounded-lg transition"
-            >
-              部屋を作る
-            </button>
-            <button
-              onClick={() => setMode('join')}
-              className="w-full py-4 bg-green-600 hover:bg-green-700 text-white text-xl font-semibold rounded-lg transition"
-            >
-              部屋に入る
-            </button>
+      <div className="app-bg min-h-screen flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-sm anim-fade-up">
+          <Brand />
+          <div className="bg-surface rounded-2xl elev border border-line p-7 mt-9">
+            <div className="space-y-3">
+              <button
+                onClick={() => setMode('create')}
+                className="group w-full flex items-center justify-between px-5 py-4 bg-ink hover:bg-ink-soft text-white rounded-xl font-medium transition-colors"
+              >
+                <span>部屋を作る</span>
+                <span className="text-white/40 group-hover:translate-x-0.5 transition-transform">→</span>
+              </button>
+              <button
+                onClick={() => setMode('join')}
+                className="group w-full flex items-center justify-between px-5 py-4 bg-surface hover:bg-surface-2 text-ink border border-line rounded-xl font-medium transition-colors"
+              >
+                <span>部屋に入る</span>
+                <span className="text-muted group-hover:translate-x-0.5 transition-transform">→</span>
+              </button>
+            </div>
           </div>
+          <p className="text-center text-muted text-xs mt-6 tracking-wide">オンラインでドボンを楽しもう</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-green-900 p-4">
-      <h1 className="text-4xl font-bold text-white mb-8">Dobon Online</h1>
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-          {mode === 'create' ? '部屋を作る' : '部屋に入る'}
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="playerName" className="block text-sm font-medium text-gray-700 mb-1">
-              あなたの名前
-            </label>
-            <input
-              type="text"
-              id="playerName"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="名前を入力"
-              maxLength={10}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#333]"
-            />
+    <div className="app-bg min-h-screen flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-sm anim-fade-up">
+        <Brand />
+        <div className="bg-surface rounded-2xl elev border border-line p-7 mt-8">
+          <div className="flex items-center gap-2 mb-6">
+            <span className={`w-1.5 h-5 rounded-full ${mode === 'create' ? 'bg-accent' : 'bg-ink'}`} />
+            <h2 className="text-lg font-semibold text-ink tracking-tight">
+              {mode === 'create' ? '部屋を作る' : '部屋に入る'}
+            </h2>
           </div>
 
-          <div>
-            <label htmlFor="roomId" className="block text-sm font-medium text-gray-700 mb-1">
-              ルームID（5桁の数字）
-            </label>
-            <input
-              type="text"
-              id="roomId"
-              value={roomId}
-              onChange={(e) => {
-                const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 5);
-                setRoomId(value);
-              }}
-              placeholder="12345"
-              maxLength={5}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-2xl tracking-widest text-[#333]"
-            />
-          </div>
-
-          {/* マイマーク選択 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              マイマーク
-            </label>
-            <div className="flex justify-center gap-2">
-              {SUITS.map((suit) => (
-                <button
-                  key={suit}
-                  type="button"
-                  onClick={() => setMyMark(suit)}
-                  className={`w-14 h-14 text-3xl rounded-lg border-2 transition ${
-                    myMark === suit
-                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-300'
-                      : 'border-gray-300 bg-white hover:border-gray-400'
-                  } ${suit === 'hearts' || suit === 'diamonds' ? 'text-red-500' : 'text-gray-800'}`}
-                >
-                  {SUIT_SYMBOLS[suit]}
-                </button>
-              ))}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="playerName" className="block text-xs font-medium text-muted mb-1.5">
+                あなたの名前
+              </label>
+              <input
+                type="text"
+                id="playerName"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder="名前を入力"
+                maxLength={10}
+                className="w-full px-3.5 py-2.5 bg-surface-2 border border-line rounded-xl text-ink placeholder:text-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 transition"
+              />
             </div>
-          </div>
 
-          {/* 部屋作成時のみの設定 */}
-          {mode === 'create' && (
-            <>
-              {/* ゲームモード選択 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  ゲームモード
-                </label>
-                <div className="flex gap-2">
+            <div>
+              <label htmlFor="roomId" className="block text-xs font-medium text-muted mb-1.5">
+                ルームID（5桁の数字）
+              </label>
+              <input
+                type="text"
+                id="roomId"
+                value={roomId}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 5);
+                  setRoomId(value);
+                }}
+                placeholder="12345"
+                maxLength={5}
+                className="w-full px-4 py-2.5 bg-surface-2 border border-line rounded-xl text-center text-2xl font-mono tracking-[0.4em] text-ink placeholder:text-muted/50 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 transition"
+              />
+            </div>
+
+            {/* マイマーク選択 */}
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1.5">
+                マイマーク
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {SUITS.map((suit) => (
                   <button
+                    key={suit}
                     type="button"
-                    onClick={() => setGameMode('classic')}
-                    className={`flex-1 py-3 rounded-lg border-2 font-semibold transition ${
-                      gameMode === 'classic'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-300'
-                        : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-                    }`}
+                    onClick={() => setMyMark(suit)}
+                    className={`h-12 text-2xl rounded-xl border transition ${
+                      myMark === suit
+                        ? 'border-accent bg-accent-soft ring-2 ring-accent/15'
+                        : 'border-line bg-surface-2 hover:border-muted/40'
+                    } ${suit === 'hearts' || suit === 'diamonds' ? 'text-[#d8434a]' : 'text-ink'}`}
                   >
-                    クラシック
+                    {SUIT_SYMBOLS[suit]}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setGameMode('uno')}
-                    className={`flex-1 py-3 rounded-lg border-2 font-semibold transition ${
-                      gameMode === 'uno'
-                        ? 'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-300'
-                        : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-                    }`}
-                  >
-                    UNO
-                  </button>
-                </div>
+                ))}
               </div>
+            </div>
 
-              {/* ジョーカー枚数設定（クラシックモードのみ） */}
-              {gameMode === 'classic' && (
+            {/* 部屋作成時のみの設定 */}
+            {mode === 'create' && (
+              <>
+                {/* ゲームモード選択 */}
                 <div>
-                  <label htmlFor="jokerCount" className="block text-sm font-medium text-gray-700 mb-1">
-                    ジョーカーの枚数
+                  <label className="block text-xs font-medium text-muted mb-1.5">
+                    ゲームモード
                   </label>
-                  <div className="flex items-center gap-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGameMode('classic')}
+                      className={`py-2.5 rounded-xl border text-sm font-medium transition ${
+                        gameMode === 'classic'
+                          ? 'border-accent bg-accent-soft text-accent-ink ring-2 ring-accent/15'
+                          : 'border-line bg-surface-2 text-muted hover:border-muted/40'
+                      }`}
+                    >
+                      クラシック
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGameMode('uno')}
+                      className={`py-2.5 rounded-xl border text-sm font-medium transition ${
+                        gameMode === 'uno'
+                          ? 'border-accent bg-accent-soft text-accent-ink ring-2 ring-accent/15'
+                          : 'border-line bg-surface-2 text-muted hover:border-muted/40'
+                      }`}
+                    >
+                      UNO
+                    </button>
+                  </div>
+                </div>
+
+                {/* ジョーカー枚数設定（クラシックモードのみ） */}
+                {gameMode === 'classic' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label htmlFor="jokerCount" className="text-xs font-medium text-muted">
+                        ジョーカーの枚数
+                      </label>
+                      <span className="text-sm font-semibold text-ink tabular-nums">{jokerCount}</span>
+                    </div>
                     <input
                       type="range"
                       id="jokerCount"
@@ -259,81 +270,95 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
                       max={4}
                       value={jokerCount}
                       onChange={(e) => setJokerCount(parseInt(e.target.value, 10))}
-                      className="flex-1"
+                      className="w-full accent-[var(--color-accent)]"
                     />
-                    <span className="text-xl font-bold text-gray-800 w-8 text-center">{jokerCount}</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">0〜4枚から選択できます</p>
-                </div>
-              )}
+                )}
 
-              {/* レート設定 */}
-              <div>
-                <label htmlFor="rate" className="block text-sm font-medium text-gray-700 mb-1">
-                  レート (EVJ)
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    id="rate"
-                    min={1}
-                    value={rate}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value, 10);
-                      if (!isNaN(value) && value > 0) {
-                        setRate(value);
-                      }
-                    }}
-                    className="w-full px-4 py-3 pr-14 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#333]"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">EVJ</span>
+                {/* レート設定 */}
+                <div>
+                  <label htmlFor="rate" className="block text-xs font-medium text-muted mb-1.5">
+                    レート
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      id="rate"
+                      min={1}
+                      value={rate}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value, 10);
+                        if (!isNaN(value) && value > 0) {
+                          setRate(value);
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 pr-14 bg-surface-2 border border-line rounded-xl text-ink focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 transition"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted font-medium">EVJ</span>
+                  </div>
                 </div>
-              </div>
 
-              {/* 親子ルール */}
-              <div>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <div
+                {/* 親子ルール */}
+                <div className="flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 px-3.5 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-ink">親子ルール</p>
+                    <p className="text-xs text-muted mt-0.5">親が勝つとスコア1.5倍</p>
+                  </div>
+                  <button
+                    type="button"
                     onClick={() => setOyakoRule(!oyakoRule)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      oyakoRule ? 'bg-purple-500' : 'bg-gray-300'
+                    className={`mt-0.5 shrink-0 relative w-11 h-6 rounded-full transition-colors ${
+                      oyakoRule ? 'bg-accent' : 'bg-line'
                     }`}
                   >
-                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                      oyakoRule ? 'translate-x-6' : ''
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white elev-sm rounded-full transition-transform ${
+                      oyakoRule ? 'translate-x-5' : ''
                     }`} />
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">親子ルール</span>
-                </label>
-                <p className="text-xs text-gray-500 mt-1">全員が親を1回ずつ務める。親が勝つとスコア1.5倍</p>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {error && (
+              <div className="bg-danger-soft border border-danger/30 text-danger px-3.5 py-2.5 rounded-xl text-sm">
+                {error}
               </div>
-            </>
-          )}
+            )}
 
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-              {error}
+            <div className="flex gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="px-5 py-2.5 bg-surface border border-line hover:bg-surface-2 text-ink-soft font-medium rounded-xl transition"
+              >
+                戻る
+              </button>
+              <button
+                type="submit"
+                disabled={roomId.length !== 5 || !playerName.trim()}
+                className="flex-1 py-2.5 bg-ink hover:bg-ink-soft disabled:bg-line disabled:text-muted disabled:cursor-not-allowed text-white font-medium rounded-xl transition"
+              >
+                {mode === 'create' ? '作成する' : '参加する'}
+              </button>
             </div>
-          )}
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={handleBack}
-              className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
-            >
-              戻る
-            </button>
-            <button
-              type="submit"
-              disabled={roomId.length !== 5 || !playerName.trim()}
-              className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
-            >
-              {mode === 'create' ? '作成' : '参加'}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function Brand() {
+  return (
+    <div className="text-center">
+      <div className="inline-flex items-center gap-2.5">
+        <span className="flex gap-0.5 text-2xl leading-none">
+          <span className="text-ink">♠</span>
+          <span className="text-[#d8434a]">♥</span>
+        </span>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">Dobon</h1>
+      </div>
+      <p className="text-[11px] tracking-[0.35em] text-muted mt-1.5 font-medium">O N L I N E</p>
     </div>
   );
 }

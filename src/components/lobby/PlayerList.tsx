@@ -46,56 +46,59 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
   const pairSummary = room.gameHistory ? computePairSummary(room.gameHistory) : [];
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-green-900 p-4">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+    <div className="app-bg min-h-screen flex flex-col items-center justify-center p-6">
+      <div className="bg-surface rounded-2xl elev border border-line p-7 w-full max-w-md anim-fade-up">
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">待機中</h2>
-          <p className="text-gray-600">
-            ルームID: <span className="font-mono text-2xl font-bold">{room.id}</span>
-          </p>
-          <p className="text-gray-500 text-sm mt-1">
-            モード: <span className={`font-semibold ${room.gameMode === 'uno' ? 'text-orange-600' : 'text-blue-600'}`}>
+          <p className="text-[11px] tracking-[0.3em] text-muted font-medium mb-2">ルームID</p>
+          <p className="font-mono text-3xl font-semibold tracking-[0.2em] text-ink">{room.id}</p>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-soft text-accent-ink">
               {room.gameMode === 'uno' ? 'UNO' : 'クラシック'}
             </span>
             {room.oyakoRule && (
-              <span className="ml-2 text-purple-600 font-semibold">親子ルール ON</span>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-surface-2 border border-line text-ink-soft">
+                親子ルール
+              </span>
             )}
-          </p>
+          </div>
         </div>
 
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">
-            プレイヤー ({room.players.length}/{room.maxPlayers})
-          </h3>
-          <ul className="space-y-2">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-ink-soft">プレイヤー</h3>
+            <span className="text-xs text-muted tabular-nums">{room.players.length} / {room.maxPlayers}</span>
+          </div>
+          <ul className="space-y-1.5">
             {room.players.map((player) => {
               const isDisconnected = player.isDisconnected || disconnectedPlayers.has(player.id);
+              const initial = player.name.trim().charAt(0) || '?';
               return (
                 <li
                   key={player.id}
-                  className={`flex items-center justify-between px-4 py-3 rounded-lg ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition ${
                     player.id === playerId
-                      ? 'bg-blue-100 border-2 border-blue-500'
+                      ? 'bg-accent-soft border-accent/30'
                       : isDisconnected
-                      ? 'bg-gray-200 opacity-60'
-                      : 'bg-gray-100'
+                      ? 'bg-surface-2 border-line opacity-60'
+                      : 'bg-surface-2 border-line'
                   }`}
                 >
-                  <span className={`font-medium ${isDisconnected ? 'text-gray-400' : 'text-[#333]'}`}>
-                    {player.name}
-                    {player.id === playerId && ' (あなた)'}
-                    {isDisconnected && ' (離席中)'}
+                  <span className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${
+                    player.id === playerId ? 'bg-accent text-white' : 'bg-white border border-line text-ink-soft'
+                  }`}>
+                    {initial}
                   </span>
-                  <div className="flex gap-2">
+                  <span className={`flex-1 font-medium text-sm ${isDisconnected ? 'text-muted' : 'text-ink'}`}>
+                    {player.name}
+                    {player.id === playerId && <span className="text-muted font-normal"> (あなた)</span>}
+                    {isDisconnected && <span className="text-muted font-normal"> (離席中)</span>}
+                  </span>
+                  <div className="flex gap-1.5">
                     {isDisconnected && (
-                      <span className="text-xs bg-gray-500 text-white px-2 py-1 rounded">
-                        離席
-                      </span>
+                      <span className="text-[10px] bg-line text-ink-soft px-2 py-0.5 rounded-full font-medium">離席</span>
                     )}
                     {player.isHost && (
-                      <span className="text-xs bg-yellow-400 text-yellow-900 px-2 py-1 rounded">
-                        ホスト
-                      </span>
+                      <span className="text-[10px] bg-gold/15 text-gold px-2 py-0.5 rounded-full font-medium">ホスト</span>
                     )}
                   </div>
                 </li>
@@ -105,7 +108,7 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
         </div>
 
         {room.players.length < room.minPlayers && (
-          <p className="text-center text-gray-500 mb-4">
+          <p className="text-center text-muted text-sm mb-4">
             あと{room.minPlayers - room.players.length}人で開始できます
           </p>
         )}
@@ -113,21 +116,19 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
         {/* 個人間の総合成績（履歴を集計、A→Bが純流入額） */}
         {pairSummary.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-700 mb-3">
-              総合成績
-            </h3>
-            <div className="bg-amber-50 rounded-lg p-3 space-y-1.5 border border-amber-200">
+            <h3 className="text-sm font-semibold text-ink-soft mb-2.5">総合成績</h3>
+            <div className="rounded-xl border border-line bg-surface-2 p-2 space-y-1">
               {pairSummary.map((p, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between gap-2 px-3 py-1.5 bg-white rounded text-sm border border-amber-100"
+                  className="flex items-center justify-between gap-2 px-3 py-2 bg-surface rounded-lg text-sm border border-line"
                 >
-                  <span className="text-gray-700 truncate flex-1">
-                    <span className="font-semibold text-orange-700">{p.from}</span>
-                    <span className="mx-1 text-amber-600">→</span>
-                    <span className="text-gray-700">{p.to}</span>
+                  <span className="truncate flex-1">
+                    <span className="font-medium text-ink">{p.from}</span>
+                    <span className="mx-1.5 text-muted">→</span>
+                    <span className="text-muted">{p.to}</span>
                   </span>
-                  <span className="font-bold whitespace-nowrap text-orange-700">
+                  <span className="font-semibold whitespace-nowrap text-accent-ink tabular-nums">
                     {p.net.toLocaleString()} EVJ
                   </span>
                 </div>
@@ -139,38 +140,35 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
         {/* セッション内の対戦履歴（このルームが残っている間のみ保持） */}
         {room.gameHistory && room.gameHistory.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-700 mb-3">
-              対戦履歴 ({room.gameHistory.length}戦)
+            <h3 className="text-sm font-semibold text-ink-soft mb-2.5">
+              対戦履歴 <span className="text-muted font-normal">({room.gameHistory.length}戦)</span>
             </h3>
-            <div className="bg-gray-50 rounded-lg p-3 max-h-64 overflow-y-auto space-y-1.5">
+            <div className="rounded-xl border border-line bg-surface-2 p-2 max-h-56 overflow-y-auto scroll-soft space-y-1">
               {[...room.gameHistory].reverse().map((entry, i) => {
                 const winnerNames = entry.winners.map(w => w.playerName).join(', ');
                 const scoreStr = entry.totalScore.toLocaleString();
                 const isPositive = entry.totalScore > 0;
-                const isNegative = entry.totalScore < 0;
                 return (
                   <div
                     key={room.gameHistory!.length - i - 1}
-                    className="flex items-center justify-between gap-2 px-3 py-1.5 bg-white rounded text-sm border border-gray-200"
+                    className="flex items-center justify-between gap-2 px-3 py-2 bg-surface rounded-lg text-sm border border-line"
                   >
-                    <span className="text-gray-700 truncate flex-1">
-                      <span className={`font-semibold ${entry.isWorst ? 'text-red-600' : isPositive ? 'text-green-600' : 'text-gray-600'}`}>
+                    <span className="truncate flex-1">
+                      <span className={`font-medium ${entry.isWorst ? 'text-danger' : 'text-ink'}`}>
                         {winnerNames}
                       </span>
-                      <span className="mx-1 text-gray-400">→</span>
-                      <span className="text-gray-700">{entry.loserName ?? '—'}</span>
+                      <span className="mx-1.5 text-muted">→</span>
+                      <span className="text-muted">{entry.loserName ?? '—'}</span>
                     </span>
-                    <span className={`font-bold whitespace-nowrap ${
-                      entry.isWorst ? 'text-red-600' :
-                      isPositive ? 'text-orange-600' :
-                      isNegative ? 'text-red-500' : 'text-gray-500'
+                    <span className={`font-semibold whitespace-nowrap tabular-nums ${
+                      entry.isWorst ? 'text-danger' : isPositive ? 'text-accent-ink' : 'text-muted'
                     }`}>
-                      {isPositive ? '+' : ''}{scoreStr} EVJ
+                      {isPositive ? '+' : ''}{scoreStr}
                     </span>
-                    <span className="flex gap-1 text-xs">
-                      {entry.isDobonGaeshi && <span title="ドボン返し">🔄</span>}
-                      {entry.isWorst && <span title="ワースト">💀</span>}
-                      {entry.isOnanii && <span title="オナニー">🎊</span>}
+                    <span className="flex gap-1">
+                      {entry.isDobonGaeshi && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-2 border border-line text-muted">返し</span>}
+                      {entry.isWorst && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-danger-soft border border-danger/20 text-danger">ワースト</span>}
+                      {entry.isOnanii && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-2 border border-line text-muted">単</span>}
                     </span>
                   </div>
                 );
@@ -179,26 +177,26 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
           </div>
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {isHost && (
             <button
               onClick={onStartGame}
               disabled={!canStart}
-              className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-lg font-semibold rounded-lg transition"
+              className="w-full py-3 bg-ink hover:bg-ink-soft disabled:bg-line disabled:text-muted disabled:cursor-not-allowed text-white font-medium rounded-xl transition"
             >
               ゲーム開始
             </button>
           )}
 
           {!isHost && canStart && (
-            <p className="text-center text-gray-600">
-              ホストがゲームを開始するのを待っています...
+            <p className="text-center text-muted text-sm py-1">
+              ホストの開始を待っています…
             </p>
           )}
 
           <button
             onClick={onLeaveRoom}
-            className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition"
+            className="w-full py-2.5 bg-surface border border-line hover:bg-danger-soft hover:border-danger/30 hover:text-danger text-ink-soft font-medium rounded-xl transition"
           >
             退出
           </button>

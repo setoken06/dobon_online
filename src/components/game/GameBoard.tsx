@@ -287,7 +287,7 @@ export function GameBoard({
   }, [selectedCardIds, myPlayer?.hand, gameState.topCard, gameState.effectiveTopCard]);
 
   return (
-    <div className="min-h-screen bg-green-900 p-4 flex flex-col">
+    <div className="felt-bg min-h-screen p-4 flex flex-col">
       {/* 結果モーダル（ドボン演出を経由した場合はドボンリザルトフェーズで表示済みなので非表示） */}
       {isFinished && gameState.winnerName && !gameState.winners && (
         <GameResult
@@ -310,39 +310,41 @@ export function GameBoard({
       {/* スマホ用: ターン + レート表示（横並び） */}
       <div className="md:hidden flex justify-between items-center mb-2">
         {isDisplayMyTurn ? (
-          <div className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full font-bold text-sm animate-pulse">
+          <div className="flex items-center gap-1.5 bg-accent text-white px-3 py-1.5 rounded-full font-medium text-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-white anim-glow" />
             あなたのターン
           </div>
         ) : (
-          <div className="bg-gray-600 text-white px-3 py-1 rounded-full font-medium text-sm">
+          <div className="bg-white/8 text-white/80 border border-white/10 px-3 py-1.5 rounded-full font-medium text-sm">
             {displayCurrentPlayerName} のターン
           </div>
         )}
-        <div className="flex gap-1 items-center">
+        <div className="flex gap-1.5 items-center">
           {gameState.oyakoRoundState && (
-            <div className="bg-purple-900/70 text-white px-2 py-1 rounded-lg">
-              <span className="text-xs">{gameState.oyakoRoundState.currentGameNumber}/{gameState.oyakoRoundState.totalGames}局</span>
-              <span className="ml-1 text-xs font-bold text-purple-300">親:{gameState.oyakoRoundState.oyaPlayerName}</span>
+            <div className="bg-white/8 border border-white/10 text-white px-2.5 py-1.5 rounded-full">
+              <span className="text-[11px] text-white/60">{gameState.oyakoRoundState.currentGameNumber}/{gameState.oyakoRoundState.totalGames}局</span>
+              <span className="ml-1 text-[11px] font-medium text-white">親:{gameState.oyakoRoundState.oyaPlayerName}</span>
             </div>
           )}
-          <div className="bg-black/50 text-white px-3 py-1 rounded-lg">
-            <span className="text-xs">レート</span>
-            <span className="ml-1 text-sm font-bold text-yellow-400">{gameState.rate} EVJ</span>
+          <div className="bg-white/8 border border-white/10 text-white px-3 py-1.5 rounded-full">
+            <span className="text-[11px] text-white/50">レート</span>
+            <span className="ml-1.5 text-sm font-semibold text-[#e3b53b]">{gameState.rate}</span>
           </div>
         </div>
       </div>
 
       {/* PC用: レート + 親表示（右上固定） */}
-      <div className="hidden md:block absolute top-4 right-4 space-y-1">
-        <div className="bg-black/50 text-white px-4 py-2 rounded-lg">
-          <span className="text-sm">レート</span>
-          <span className="ml-2 text-xl font-bold text-yellow-400">{gameState.rate} EVJ</span>
+      <div className="hidden md:block absolute top-4 right-4 space-y-1.5 text-right">
+        <div className="inline-flex items-baseline gap-2 bg-white/8 border border-white/10 backdrop-blur text-white px-4 py-2 rounded-full">
+          <span className="text-xs text-white/50 tracking-wide">レート</span>
+          <span className="text-lg font-semibold text-[#e3b53b] tabular-nums">{gameState.rate}</span>
+          <span className="text-[11px] text-white/40">EVJ</span>
         </div>
         {gameState.oyakoRoundState && (
-          <div className="bg-purple-900/70 text-white px-4 py-2 rounded-lg text-center">
-            <span className="text-xs">第{gameState.oyakoRoundState.currentGameNumber}/{gameState.oyakoRoundState.totalGames}局</span>
-            <span className="ml-2 text-sm font-bold text-purple-300">親: {gameState.oyakoRoundState.oyaPlayerName}</span>
-            {gameState.oyaPlayerId === playerId && <span className="ml-1 text-yellow-400">（あなた）</span>}
+          <div className="bg-white/8 border border-white/10 backdrop-blur text-white px-4 py-2 rounded-full text-center">
+            <span className="text-xs text-white/60">第{gameState.oyakoRoundState.currentGameNumber}/{gameState.oyakoRoundState.totalGames}局</span>
+            <span className="ml-2 text-sm font-medium">親: {gameState.oyakoRoundState.oyaPlayerName}</span>
+            {gameState.oyaPlayerId === playerId && <span className="ml-1 text-[#e3b53b]">（あなた）</span>}
           </div>
         )}
       </div>
@@ -430,20 +432,21 @@ export function GameBoard({
 
       {/* ドボン可能時のオーバーレイ */}
       {gameState.canDobon && !isFinished && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
-          <div className="bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl p-8 shadow-2xl text-center animate-pulse">
-            <h2 className="text-4xl font-bold text-white mb-4">ドボン！</h2>
-            <p className="text-white/90 mb-6">場のカードで上がれます</p>
-            <div className="flex gap-4 justify-center">
+        <div className="fixed inset-0 bg-[#0d1015]/75 backdrop-blur-sm flex items-center justify-center z-30">
+          <div className="bg-surface rounded-3xl p-8 elev-lg border border-line text-center anim-pop max-w-xs w-full mx-4">
+            <span className="inline-block w-10 h-1 rounded-full bg-danger mb-4" />
+            <h2 className="text-2xl font-semibold text-ink mb-1 tracking-tight">ドボン！</h2>
+            <p className="text-sm text-muted mb-6">場のカードで上がれます</p>
+            <div className="space-y-2.5">
               <button
                 onClick={onDobon}
-                className="px-8 py-4 bg-white text-red-600 font-bold text-xl rounded-lg hover:bg-gray-100 transition transform hover:scale-105"
+                className="w-full py-3.5 bg-danger hover:brightness-95 text-white font-semibold text-lg rounded-xl transition"
               >
                 ドボン！
               </button>
               <button
                 onClick={onSkipDobon}
-                className="px-8 py-4 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 transition"
+                className="w-full py-2.5 bg-surface border border-line hover:bg-surface-2 text-ink-soft font-medium rounded-xl transition"
               >
                 スキップ
               </button>
@@ -454,34 +457,30 @@ export function GameBoard({
 
       {/* ドボン返し可能時のオーバーレイ */}
       {gameState.canDobonGaeshi && !isFinished && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
-          <div className="bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl p-8 shadow-2xl text-center animate-pulse">
-            <h2 className="text-4xl font-bold text-white mb-4">ドボン返し！</h2>
+        <div className="fixed inset-0 bg-[#0d1015]/75 backdrop-blur-sm flex items-center justify-center z-30">
+          <div className="bg-surface rounded-3xl p-8 elev-lg border border-line text-center anim-pop max-w-sm w-full mx-4">
+            <span className="inline-block w-10 h-1 rounded-full bg-accent mb-4" />
+            <h2 className="text-2xl font-semibold text-ink mb-2 tracking-tight">ドボン返し！</h2>
             {gameState.dobonPlayerNames && gameState.dobonPlayerNames.length > 1 ? (
-              <>
-                <p className="text-white/90 mb-2">
-                  {gameState.dobonPlayerNames.join(', ')} がドボンしました
-                </p>
-                <p className="text-white/90 mb-6">
-                  ドボン返し！（手札合計: あなた + {gameState.dobonPlayerNames.length}人分）
-                </p>
-              </>
+              <p className="text-sm text-muted mb-6">
+                {gameState.dobonPlayerNames.join(', ')} がドボン<br />
+                手札合計: あなた + {gameState.dobonPlayerNames.length}人分
+              </p>
             ) : (
-              <>
-                <p className="text-white/90 mb-2">{gameState.dobonPlayerName} がドボンしました</p>
-                <p className="text-white/90 mb-6">あなたも同じ数字で上がれます！</p>
-              </>
+              <p className="text-sm text-muted mb-6">
+                {gameState.dobonPlayerName} がドボン<br />あなたも同じ数字で上がれます
+              </p>
             )}
-            <div className="flex gap-4 justify-center">
+            <div className="space-y-2.5">
               <button
                 onClick={onDobonGaeshi}
-                className="px-8 py-4 bg-white text-purple-600 font-bold text-xl rounded-lg hover:bg-gray-100 transition transform hover:scale-105"
+                className="w-full py-3.5 bg-accent hover:bg-accent-ink text-white font-semibold text-lg rounded-xl transition"
               >
                 ドボン返し！
               </button>
               <button
                 onClick={onSkipDobonGaeshi}
-                className="px-8 py-4 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 transition"
+                className="w-full py-2.5 bg-surface border border-line hover:bg-surface-2 text-ink-soft font-medium rounded-xl transition"
               >
                 スキップ
               </button>
@@ -689,11 +688,12 @@ export function GameBoard({
       {/* ターン表示（PC用・中央配置） */}
       <div className="hidden md:block text-center mb-4">
         {isDisplayMyTurn ? (
-          <div className="inline-block bg-yellow-400 text-yellow-900 px-6 py-2 rounded-full font-bold text-lg animate-pulse">
+          <div className="inline-flex items-center gap-2 bg-accent text-white px-6 py-2 rounded-full font-medium">
+            <span className="w-2 h-2 rounded-full bg-white anim-glow" />
             あなたのターン
           </div>
         ) : (
-          <div className="inline-block bg-gray-600 text-white px-6 py-2 rounded-full font-medium">
+          <div className="inline-block bg-white/8 border border-white/10 text-white/80 px-6 py-2 rounded-full font-medium">
             {displayCurrentPlayerName} のターン
           </div>
         )}
@@ -720,12 +720,12 @@ export function GameBoard({
       {/* アクションボタン */}
       {isMyTurn && !isWaitingForDobonAction && (
         <div className="flex flex-col items-center gap-3 mb-4">
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center gap-3">
             {/* 選択したカードを出すボタン */}
             {selectedCardIds.length > 0 && canPlaySelected && (
               <button
                 onClick={handlePlayCards}
-                className="px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition"
+                className="px-8 py-3 bg-accent hover:bg-accent-ink text-white font-medium rounded-xl transition shadow-[0_8px_24px_rgba(15,157,118,0.35)]"
               >
                 {selectedCardIds.length === 1 ? 'カードを出す' : `${selectedCardIds.length}枚出す`}
               </button>
@@ -734,7 +734,7 @@ export function GameBoard({
             {!gameState.hasDrawnThisTurn && hasPlayableCard && (
               <button
                 onClick={onDrawCard}
-                className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition"
+                className="px-6 py-3 bg-white/10 hover:bg-white/15 border border-white/15 text-white font-medium rounded-xl transition"
               >
                 カードを引く
               </button>
@@ -743,7 +743,7 @@ export function GameBoard({
             {canPass && (
               <button
                 onClick={onPass}
-                className="px-8 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition"
+                className="px-8 py-3 bg-white/10 hover:bg-white/15 border border-white/15 text-white font-medium rounded-xl transition"
               >
                 パス
               </button>
@@ -751,22 +751,22 @@ export function GameBoard({
           </div>
           {/* 状態メッセージ */}
           {gameState.mustPlayCard && (
-            <span className="text-red-400 text-center font-bold">
+            <span className="text-[#e8888c] text-center text-sm font-medium">
               手札が8枚以上です。カードを出してください（パス不可）
             </span>
           )}
           {gameState.hasDrawnThisTurn && !gameState.mustPlayCard && (
-            <span className="text-yellow-300 text-center">
+            <span className="text-white/65 text-center text-sm">
               カードを引きました。出せるカードがあれば出すか、パスしてください
             </span>
           )}
           {!gameState.hasDrawnThisTurn && !hasPlayableCard && (
-            <span className="text-yellow-300 text-center animate-pulse">
-              出せるカードがありません。自動でカードを引いています...
+            <span className="text-white/65 text-center text-sm anim-glow">
+              出せるカードがありません。自動でカードを引いています…
             </span>
           )}
           {!gameState.hasDrawnThisTurn && hasPlayableCard && !gameState.mustPlayCard && (
-            <span className="text-yellow-300 text-center">
+            <span className="text-white/65 text-center text-sm">
               カードを選択してください（同じ数字は4枚まで同時に出せます）
             </span>
           )}
@@ -777,12 +777,13 @@ export function GameBoard({
       <div className="relative">
         {/* 自分のリーチ状態と待ち数字表示 */}
         {myPlayer?.isReach && !gameState.canDobon && !isFinished && (
-          <div className="flex justify-center items-center gap-4 mb-2">
-            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-full font-bold shadow-lg animate-pulse">
-              リーチ中！
+          <div className="flex justify-center items-center gap-3 mb-2">
+            <div className="flex items-center gap-1.5 bg-[#e3b53b] text-[#15171c] px-4 py-1.5 rounded-full font-semibold text-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#15171c] anim-glow" />
+              リーチ中
             </div>
             {gameState.winningNumbers && gameState.winningNumbers.length > 0 && (
-              <div className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg">
+              <div className="bg-white/10 border border-white/15 text-white px-4 py-1.5 rounded-full font-medium text-sm">
                 待ち: {gameState.winningNumbers.sort((a, b) => a - b).map(n => {
                   if (n === -1) return 'ドロー2';
                   if (n === -2) return 'スキップ';

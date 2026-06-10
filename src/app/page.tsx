@@ -40,10 +40,10 @@ export default function Home() {
 
   // 復帰中オーバーレイ
   const reconnectingOverlay = isReconnecting && (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-8 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-        <p className="text-gray-800 text-lg font-semibold">復帰中...</p>
+    <div className="fixed inset-0 bg-[#0d1015]/70 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-surface rounded-2xl elev-lg border border-line p-8 text-center anim-pop">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-accent border-t-transparent mx-auto mb-4"></div>
+        <p className="text-ink text-base font-medium">復帰中…</p>
       </div>
     </div>
   );
@@ -51,8 +51,11 @@ export default function Home() {
   // 接続待ち表示
   if (!isConnected && !isReconnecting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-green-900">
-        <div className="text-white text-xl">接続中...</div>
+      <div className="app-bg min-h-screen flex items-center justify-center">
+        <div className="flex items-center gap-3 text-muted">
+          <span className="animate-spin rounded-full h-5 w-5 border-2 border-muted/40 border-t-muted"></span>
+          <span className="text-sm">接続中…</span>
+        </div>
       </div>
     );
   }
@@ -60,36 +63,39 @@ export default function Home() {
   // 復帰可能な場合（部屋に入っていない状態でセッション情報がある）
   if (canRejoin && rejoinInfo && !room) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-green-900 p-4">
+      <div className="app-bg min-h-screen flex flex-col items-center justify-center p-6">
         {reconnectingOverlay}
-        <h1 className="text-4xl font-bold text-white mb-8">Dobon Online</h1>
-        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">ゲームに復帰</h2>
-          <p className="text-gray-600 mb-2">
-            前回のゲームが見つかりました
-          </p>
-          <p className="text-gray-800 mb-6">
-            ルームID: <span className="font-mono font-bold">{rejoinInfo.roomId}</span>
-            <br />
-            プレイヤー: <span className="font-bold">{rejoinInfo.playerName}</span>
-          </p>
+        <div className="bg-surface rounded-2xl elev border border-line p-7 w-full max-w-sm text-center anim-fade-up">
+          <span className="inline-block w-10 h-1 rounded-full bg-accent mb-4" />
+          <h2 className="text-lg font-semibold text-ink mb-1 tracking-tight">ゲームに復帰</h2>
+          <p className="text-sm text-muted mb-4">前回のゲームが見つかりました</p>
+          <div className="rounded-xl border border-line bg-surface-2 p-3 mb-5 text-sm">
+            <div className="flex justify-between py-0.5">
+              <span className="text-muted">ルームID</span>
+              <span className="font-mono font-semibold text-ink tracking-wider">{rejoinInfo.roomId}</span>
+            </div>
+            <div className="flex justify-between py-0.5">
+              <span className="text-muted">プレイヤー</span>
+              <span className="font-medium text-ink">{rejoinInfo.playerName}</span>
+            </div>
+          </div>
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="bg-danger-soft border border-danger/30 text-danger px-3.5 py-2.5 rounded-xl mb-4 text-sm">
               {error}
             </div>
           )}
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <button
               onClick={rejoinRoom}
               disabled={isReconnecting}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-xl font-semibold rounded-lg transition"
+              className="w-full py-3 bg-ink hover:bg-ink-soft disabled:bg-line disabled:text-muted text-white font-medium rounded-xl transition"
             >
               復帰する
             </button>
             <button
               onClick={cancelRejoin}
               disabled={isReconnecting}
-              className="w-full py-3 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-700 font-semibold rounded-lg transition"
+              className="w-full py-2.5 bg-surface border border-line hover:bg-surface-2 disabled:opacity-50 text-ink-soft font-medium rounded-xl transition"
             >
               新しく始める
             </button>

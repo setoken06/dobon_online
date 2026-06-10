@@ -15,10 +15,11 @@ interface HandProps {
 
 export function Hand({ cards, topCard, isMyTurn, hasDrawn, selectedCardIds, playableCardIds, onCardSelect }: HandProps) {
   return (
-    <div className="bg-green-800 rounded-lg p-4">
-      <h3 className="text-white text-sm font-semibold mb-2">
-        あなたの手札 ({cards.length}枚)
-      </h3>
+    <div className="rounded-2xl border border-white/8 bg-white/[0.03] backdrop-blur-sm p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-white/65 text-xs font-medium tracking-wide">あなたの手札</span>
+        <span className="text-white/45 text-xs tabular-nums">{cards.length}枚</span>
+      </div>
       <div className="flex flex-wrap gap-2 justify-center min-h-[100px]">
         {cards.map((card) => {
           const isPlayable = playableCardIds.has(card.id);
@@ -47,7 +48,7 @@ export function Hand({ cards, topCard, isMyTurn, hasDrawn, selectedCardIds, play
           );
         })}
         {cards.length === 0 && (
-          <div className="text-white text-lg">手札がありません</div>
+          <div className="text-white/40 text-sm self-center">手札がありません</div>
         )}
       </div>
     </div>
