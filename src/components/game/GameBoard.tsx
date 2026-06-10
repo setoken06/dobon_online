@@ -24,7 +24,6 @@ interface GameBoardProps {
   onDobonGaeshi: () => void;
   onSkipDobonGaeshi: () => void;
   onBackToLobby: () => void;
-  onNextRoundGame?: () => void;
   onConfirmInitialRate: () => void;
   onAdvanceDobonPhase: () => void;
   onChooseColor?: (color: UnoColor) => void;
@@ -44,7 +43,6 @@ export function GameBoard({
   onDobonGaeshi,
   onSkipDobonGaeshi,
   onBackToLobby,
-  onNextRoundGame,
   onConfirmInitialRate,
   onAdvanceDobonPhase,
   onChooseColor,
@@ -295,7 +293,6 @@ export function GameBoard({
           isWinner={isWinner}
           isHost={isHost}
           onBackToLobby={onBackToLobby}
-          onNextRoundGame={onNextRoundGame}
           lastDrawCards={gameState.lastDrawCards}
           finalScore={gameState.finalScore}
           winnerHandCount={gameState.winnerHandCount}
@@ -303,7 +300,6 @@ export function GameBoard({
           winners={gameState.winners}
           playerId={playerId}
           loser={gameState.loser}
-          oyakoRoundState={gameState.oyakoRoundState}
         />
       )}
 
@@ -320,12 +316,6 @@ export function GameBoard({
           </div>
         )}
         <div className="flex gap-1.5 items-center">
-          {gameState.oyakoRoundState && (
-            <div className="bg-white/8 border border-white/10 text-white px-2.5 py-1.5 rounded-full">
-              <span className="text-[11px] text-white/60">{gameState.oyakoRoundState.currentGameNumber}/{gameState.oyakoRoundState.totalGames}局</span>
-              <span className="ml-1 text-[11px] font-medium text-white">親:{gameState.oyakoRoundState.oyaPlayerName}</span>
-            </div>
-          )}
           <div className="bg-white/8 border border-white/10 text-white px-3 py-1.5 rounded-full">
             <span className="text-[11px] text-white/50">レート</span>
             <span className="ml-1.5 text-sm font-semibold text-[#e3b53b]">{gameState.rate}</span>
@@ -333,20 +323,13 @@ export function GameBoard({
         </div>
       </div>
 
-      {/* PC用: レート + 親表示（右上固定） */}
-      <div className="hidden md:block absolute top-4 right-4 space-y-1.5 text-right">
+      {/* PC用: レート表示（右上固定） */}
+      <div className="hidden md:block absolute top-4 right-4 text-right">
         <div className="inline-flex items-baseline gap-2 bg-white/8 border border-white/10 backdrop-blur text-white px-4 py-2 rounded-full">
           <span className="text-xs text-white/50 tracking-wide">レート</span>
           <span className="text-lg font-semibold text-[#e3b53b] tabular-nums">{gameState.rate}</span>
           <span className="text-[11px] text-white/40">EVJ</span>
         </div>
-        {gameState.oyakoRoundState && (
-          <div className="bg-white/8 border border-white/10 backdrop-blur text-white px-4 py-2 rounded-full text-center">
-            <span className="text-xs text-white/60">第{gameState.oyakoRoundState.currentGameNumber}/{gameState.oyakoRoundState.totalGames}局</span>
-            <span className="ml-2 text-sm font-medium">親: {gameState.oyakoRoundState.oyaPlayerName}</span>
-            {gameState.oyaPlayerId === playerId && <span className="ml-1 text-[#e3b53b]">（あなた）</span>}
-          </div>
-        )}
       </div>
 
       {/* 初期レートボーナス確認ポップアップ */}
@@ -662,13 +645,8 @@ export function GameBoard({
           onBackToLobby={() => {
             setResultDismissed(true);
             onAdvanceDobonPhase();
-            if (gameState.oyakoRoundState && !gameState.oyakoRoundState.isRoundComplete) {
-              setTimeout(() => onNextRoundGame?.(), 300);
-            } else {
-              setTimeout(onBackToLobby, 300);
-            }
+            setTimeout(onBackToLobby, 300);
           }}
-          onNextRoundGame={onNextRoundGame}
           lastDrawCards={gameState.lastDrawCards}
           finalScore={gameState.finalScore}
           winnerHandCount={gameState.winnerHandCount}
@@ -681,7 +659,6 @@ export function GameBoard({
           winnerPlayers={gameState.dobonWinnerPlayerIds
             ?.map(id => gameState.players.find(p => p.playerId === id))
             .filter((p): p is typeof gameState.players[0] => !!p)}
-          oyakoRoundState={gameState.oyakoRoundState}
         />
       )}
 

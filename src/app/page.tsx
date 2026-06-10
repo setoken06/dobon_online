@@ -30,7 +30,6 @@ export default function Home() {
     dobonGaeshi,
     skipDobonGaeshi,
     backToLobby,
-    nextRoundGame,
     confirmInitialRate,
     advanceDobonPhase,
     chooseColor,
@@ -123,7 +122,6 @@ export default function Home() {
           onDobonGaeshi={dobonGaeshi}
           onSkipDobonGaeshi={skipDobonGaeshi}
           onBackToLobby={backToLobby}
-          onNextRoundGame={nextRoundGame}
           onConfirmInitialRate={confirmInitialRate}
           onAdvanceDobonPhase={advanceDobonPhase}
           onChooseColor={chooseColor}

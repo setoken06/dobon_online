@@ -1,7 +1,7 @@
 'use client';
 
 import { Card as CardType, isJokerCard, isWildCard } from '../../types/card';
-import { WinnerInfo, LoserInfo, PlayerGameState, OyakoRoundState } from '../../types/game';
+import { WinnerInfo, LoserInfo, PlayerGameState } from '../../types/game';
 import { Card } from './Card';
 
 interface GameResultProps {
@@ -9,7 +9,6 @@ interface GameResultProps {
   isWinner: boolean;
   isHost?: boolean;
   onBackToLobby: () => void;
-  onNextRoundGame?: () => void;
   lastDrawCards?: CardType[];
   finalScore?: number;
   winnerHandCount?: number;
@@ -20,7 +19,6 @@ interface GameResultProps {
   dobonWinnerPlayerIds?: string[];
   dobonTriggerCard?: CardType;
   winnerPlayers?: PlayerGameState[];
-  oyakoRoundState?: OyakoRoundState;
 }
 
 export function GameResult({
@@ -28,7 +26,6 @@ export function GameResult({
   isWinner,
   isHost = false,
   onBackToLobby,
-  onNextRoundGame,
   lastDrawCards,
   finalScore,
   winnerHandCount,
@@ -39,7 +36,6 @@ export function GameResult({
   dobonWinnerPlayerIds,
   dobonTriggerCard,
   winnerPlayers,
-  oyakoRoundState,
 }: GameResultProps) {
   // ラストドローの最終カード（ジョーカー/ワイルド以外）を取得
   const lastNonJokerCard = lastDrawCards?.find(c => !isJokerCard(c) && !isWildCard(c));
@@ -220,51 +216,17 @@ export function GameResult({
           )
         )}
 
-        {/* 親子ルール: 累計スコア */}
-        {oyakoRoundState && (
-          <div className="rounded-2xl border border-line bg-surface-2 p-3 mb-4">
-            <p className="text-xs text-ink-soft font-semibold mb-2">
-              第{oyakoRoundState.currentGameNumber}/{oyakoRoundState.totalGames}局
-              {oyakoRoundState.isRoundComplete && ' · 最終結果'}
-            </p>
-            <div className="space-y-1">
-              {[...oyakoRoundState.playerScores]
-                .sort((a, b) => b.cumulativeScore - a.cumulativeScore)
-                .map((ps) => (
-                  <div
-                    key={ps.playerId}
-                    className={`flex justify-between items-center px-2.5 py-1.5 rounded-lg border ${
-                      ps.playerId === playerId ? 'bg-accent-soft border-accent/20' : 'bg-surface border-line'
-                    }`}
-                  >
-                    <span className={`text-sm ${ps.playerId === playerId ? 'font-medium text-accent-ink' : 'text-ink-soft'}`}>
-                      {ps.playerName}
-                      {ps.playerId === playerId && ' (あなた)'}
-                    </span>
-                    <span className={`text-sm font-semibold tabular-nums ${
-                      ps.cumulativeScore > 0 ? 'text-accent-ink' : ps.cumulativeScore < 0 ? 'text-danger' : 'text-muted'
-                    }`}>
-                      {ps.cumulativeScore > 0 ? '+' : ''}{ps.cumulativeScore.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-
         {/* ボタン */}
         {isHost ? (
           <button
             onClick={onBackToLobby}
             className="w-full py-3 bg-ink hover:bg-ink-soft text-white font-medium rounded-xl transition"
           >
-            {oyakoRoundState && !oyakoRoundState.isRoundComplete ? '次の局へ' : '待機画面に戻る'}
+            待機画面に戻る
           </button>
         ) : (
           <p className="text-muted text-sm">
-            {oyakoRoundState && !oyakoRoundState.isRoundComplete
-              ? 'ホストが次の局に進むのを待っています...'
-              : 'ホストが待機画面に戻るのを待っています...'}
+            ホストが待機画面に戻るのを待っています…
           </p>
         )}
       </div>

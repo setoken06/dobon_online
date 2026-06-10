@@ -38,7 +38,6 @@ export interface Room {
   jokerCount: number;   // ジョーカーの枚数（0-4）
   rate: number;         // レート
   gameMode: GameMode;   // ゲームモード
-  oyakoRule: boolean;   // 親子ルール
   gameHistory?: GameHistoryEntry[];  // セッション内の対戦履歴（永続化なし）
 }
 
@@ -49,5 +48,4 @@ export const DEFAULT_ROOM_CONFIG = {
   jokerCount: 2,
   rate: 100,
   gameMode: 'classic' as GameMode,
-  oyakoRule: false,
 };

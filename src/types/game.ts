@@ -17,7 +17,6 @@ export interface WinnerInfo {
   finalScore: number;
   isDobonGaeshi?: boolean;
   gaeshiMultiplier?: number;
-  isOya?: boolean;
   isWorst?: boolean; // 2枚上がり×ラストドロー1で発動するワースト判定（ペナルティ）
 }
 
@@ -88,28 +87,6 @@ export interface GameState {
   minogashiPlayerName?: string;             // 見逃し演出（ドボンスキップ時の演出）
   minogashiRateApplied?: boolean;           // 今回の見逃しでレート×2が適用されたか（初回のみtrue）
   displayCurrentPlayerId?: string;          // ターン表示用のプレイヤーID（ドボン透け対策のため実際のcurrentPlayerIdと異なる場合あり）
-  // 親子ルール関連
-  oyakoRoundState?: OyakoRoundState;        // 親子ルールのラウンド状態
-  oyaPlayerId?: string;                     // 現在の親のプレイヤーID
-}
-
-// 親子ルール: プレイヤー別累計スコア
-export interface OyakoPlayerScore {
-  playerId: string;
-  playerName: string;
-  cumulativeScore: number;
-  wasOya: boolean;
-}
-
-// 親子ルール: ラウンド状態
-export interface OyakoRoundState {
-  currentOyaIndex: number;
-  currentGameNumber: number;
-  totalGames: number;
-  playerScores: OyakoPlayerScore[];
-  isRoundComplete: boolean;
-  oyaPlayerId: string;
-  oyaPlayerName: string;
 }
 
 // ゲーム設定

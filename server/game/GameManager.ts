@@ -38,9 +38,6 @@ export class GameManager {
   private minogashiPlayerName?: string; // 見逃し演出用
   private minogashiRateApplied?: boolean; // 直近の見逃しでレート×2が適用されたか
   private lastDrawCards: Card[] = [];
-  // 親子ルール関連
-  private oyaPlayerId?: string;
-  private oyakoRoundState?: import('../../src/types/game').OyakoRoundState;
   // ドボン返し関連
   private dobonGaeshiEligiblePlayerIds: Set<string> = new Set();
   private dobonTriggerPlayerId?: string;
@@ -90,7 +87,7 @@ export class GameManager {
       player.hand = this.deck.drawMultiple(GAME_CONFIG.initialHandSize);
     }
 
-    // 開始プレイヤーを決定（親子ルール時は指定、通常はランダム）
+    // 開始プレイヤーを決定（指定があればそれを、通常はランダム）
     this.currentPlayerIndex = startPlayerIndex !== undefined
       ? startPlayerIndex
       : Math.floor(Math.random() * this.players.length);
@@ -541,9 +538,6 @@ export class GameManager {
       revealedLastDrawCount: this.dobonPhase === 'result' ? this.revealedLastDrawCount : undefined,
       minogashiPlayerName: this.minogashiPlayerName,
       minogashiRateApplied: this.minogashiRateApplied,
-      // 親子ルール関連
-      oyakoRoundState: this.oyakoRoundState,
-      oyaPlayerId: this.oyaPlayerId,
     };
   }
 
@@ -1193,9 +1187,7 @@ export class GameManager {
 
     if (this.pendingDobonIsGaeshi && this.pendingGaeshiTotalMultiplier !== undefined) {
       const gaeshiWinner = this.pendingDobonWinners[0];
-      const isOya = gaeshiWinner.playerId === this.oyaPlayerId;
-      const oyaMultiplier = isOya ? 1.5 : 1;
-      const score = this.rate * lastDrawValue * this.pendingGaeshiTotalMultiplier * oyaMultiplier;
+      const score = this.rate * lastDrawValue * this.pendingGaeshiTotalMultiplier;
       this.winners = [{
         playerId: gaeshiWinner.playerId,
         playerName: gaeshiWinner.playerName,
@@ -1203,50 +1195,33 @@ export class GameManager {
         finalScore: score,
         isDobonGaeshi: true,
         gaeshiMultiplier: this.pendingGaeshiTotalMultiplier,
-        isOya,
       }];
     } else {
       this.winners = [];
       let anyWorst = false;
       for (const dobonInfo of this.pendingDobonWinners) {
-        const isOya = dobonInfo.playerId === this.oyaPlayerId;
-        const oyaMultiplier = isOya ? 1.5 : 1;
         // ワースト判定: 2枚上がり × ラストドロー1
         const isWorst = dobonInfo.handCount === 2 && lastDrawValue === 1;
         let score: number;
         if (isWorst) {
-          // ペナルティ: レート×-25（オヤコ倍率も適用）
-          score = this.rate * -25 * oyaMultiplier;
+          // ペナルティ: レート×-25
+          score = this.rate * -25;
           anyWorst = true;
         } else {
           const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
-          score = this.rate * lastDrawValue * handCountMultiplier * oyaMultiplier;
+          score = this.rate * lastDrawValue * handCountMultiplier;
         }
         this.winners.push({
           playerId: dobonInfo.playerId,
           playerName: dobonInfo.playerName,
           handCount: dobonInfo.handCount,
           finalScore: score,
-          isOya,
           isWorst,
         });
       }
       // ワースト発生時は敗者情報にもフラグを立てる（演出用）
       if (anyWorst && this.loser) {
         this.loser.isWorst = true;
-      }
-    }
-
-    // 親子ルール: 累計スコアに現在のゲーム結果を反映
-    if (this.oyakoRoundState && this.winners.length > 0) {
-      const totalWinScore = this.winners.reduce((s, w) => s + w.finalScore, 0);
-      for (const winner of this.winners) {
-        const ps = this.oyakoRoundState.playerScores.find(s => s.playerId === winner.playerId);
-        if (ps) ps.cumulativeScore += winner.finalScore;
-      }
-      if (this.loser) {
-        const ls = this.oyakoRoundState.playerScores.find(s => s.playerId === this.loser!.playerId);
-        if (ls) ls.cumulativeScore -= totalWinScore;
       }
     }
   }
@@ -1372,14 +1347,6 @@ export class GameManager {
 
   isWaitingForInitialRateConfirm(): boolean {
     return this.waitingForInitialRateConfirm;
-  }
-
-  setOyaPlayerId(playerId: string): void {
-    this.oyaPlayerId = playerId;
-  }
-
-  setOyakoRoundState(state: import('../../src/types/game').OyakoRoundState): void {
-    this.oyakoRoundState = state;
   }
 
   getLoser(): import('../../src/types/game').LoserInfo | undefined {

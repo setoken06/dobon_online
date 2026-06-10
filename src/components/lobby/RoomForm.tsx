@@ -16,7 +16,7 @@ const STORAGE_KEYS = {
 const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
 
 interface RoomFormProps {
-  onCreateRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode: GameMode, oyakoRule?: boolean) => void;
+  onCreateRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode: GameMode) => void;
   onJoinRoom: (roomId: string, playerName: string, myMark: Suit) => void;
   error: string | null;
   onClearError: () => void;
@@ -30,7 +30,6 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
   const [rate, setRate] = useState(DEFAULT_ROOM_CONFIG.rate);
   const [myMark, setMyMark] = useState<Suit>('hearts');
   const [gameMode, setGameMode] = useState<GameMode>(DEFAULT_ROOM_CONFIG.gameMode);
-  const [oyakoRule, setOyakoRule] = useState(false);
 
   // ローカルストレージから読み込み
   useEffect(() => {
@@ -110,7 +109,7 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
     }
 
     if (mode === 'create') {
-      onCreateRoom(roomId, playerName.trim(), jokerCount, rate, myMark, gameMode, oyakoRule);
+      onCreateRoom(roomId, playerName.trim(), jokerCount, rate, myMark, gameMode);
     } else if (mode === 'join') {
       onJoinRoom(roomId, playerName.trim(), myMark);
     }
@@ -296,25 +295,6 @@ export function RoomForm({ onCreateRoom, onJoinRoom, error, onClearError }: Room
                     />
                     <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted font-medium">EVJ</span>
                   </div>
-                </div>
-
-                {/* 親子ルール */}
-                <div className="flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 px-3.5 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-ink">親子ルール</p>
-                    <p className="text-xs text-muted mt-0.5">親が勝つとスコア1.5倍</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOyakoRule(!oyakoRule)}
-                    className={`mt-0.5 shrink-0 relative w-11 h-6 rounded-full transition-colors ${
-                      oyakoRule ? 'bg-accent' : 'bg-line'
-                    }`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white elev-sm rounded-full transition-transform ${
-                      oyakoRule ? 'translate-x-5' : ''
-                    }`} />
-                  </button>
                 </div>
               </>
             )}

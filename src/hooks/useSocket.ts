@@ -71,7 +71,7 @@ interface UseSocketReturn {
   gameState: GameState | null;
   error: string | null;
   disconnectedPlayers: Map<string, string>;
-  createRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode?: GameMode, oyakoRule?: boolean) => void;
+  createRoom: (roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode?: GameMode) => void;
   joinRoom: (roomId: string, playerName: string, myMark: Suit) => void;
   rejoinRoom: () => void;
   cancelRejoin: () => void;
@@ -85,7 +85,6 @@ interface UseSocketReturn {
   dobonGaeshi: () => void;
   skipDobonGaeshi: () => void;
   backToLobby: () => void;
-  nextRoundGame: () => void;
   confirmInitialRate: () => void;
   advanceDobonPhase: () => void;
   chooseColor: (color: UnoColor) => void;
@@ -288,10 +287,10 @@ export function useSocket(): UseSocketReturn {
     };
   }, []);
 
-  const createRoom = useCallback((roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode?: GameMode, oyakoRule?: boolean) => {
+  const createRoom = useCallback((roomId: string, playerName: string, jokerCount: number, rate: number, myMark: Suit, gameMode?: GameMode) => {
     const sessionId = getOrCreateSessionId();
     saveSessionInfo(roomId, playerName);
-    socket?.emit('room:create', { roomId, playerName, sessionId, jokerCount, rate, myMark, gameMode, oyakoRule });
+    socket?.emit('room:create', { roomId, playerName, sessionId, jokerCount, rate, myMark, gameMode });
   }, [socket]);
 
   const joinRoom = useCallback((roomId: string, playerName: string, myMark: Suit) => {
@@ -379,12 +378,6 @@ export function useSocket(): UseSocketReturn {
     }
   }, [socket, room]);
 
-  const nextRoundGame = useCallback(() => {
-    if (room) {
-      socket?.emit('game:nextRoundGame', { roomId: room.id });
-    }
-  }, [socket, room]);
-
   const confirmInitialRate = useCallback(() => {
     if (room) {
       socket?.emit('game:confirmInitialRate', { roomId: room.id });
@@ -438,7 +431,6 @@ export function useSocket(): UseSocketReturn {
     dobonGaeshi,
     skipDobonGaeshi,
     backToLobby,
-    nextRoundGame,
     confirmInitialRate,
     advanceDobonPhase,
     chooseColor,

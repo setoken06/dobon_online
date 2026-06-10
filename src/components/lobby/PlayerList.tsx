@@ -55,11 +55,6 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-soft text-accent-ink">
               {room.gameMode === 'uno' ? 'UNO' : 'クラシック'}
             </span>
-            {room.oyakoRule && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-surface-2 border border-line text-ink-soft">
-                親子ルール
-              </span>
-            )}
           </div>
         </div>
 
