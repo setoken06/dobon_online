@@ -1191,18 +1191,33 @@ export class GameManager {
       }];
     } else {
       this.winners = [];
+      let anyWorst = false;
       for (const dobonInfo of this.pendingDobonWinners) {
-        const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
         const isOya = dobonInfo.playerId === this.oyaPlayerId;
         const oyaMultiplier = isOya ? 1.5 : 1;
-        const score = this.rate * lastDrawValue * handCountMultiplier * oyaMultiplier;
+        // ワースト判定: 2枚上がり × ラストドロー1
+        const isWorst = dobonInfo.handCount === 2 && lastDrawValue === 1;
+        let score: number;
+        if (isWorst) {
+          // ペナルティ: レート×-25（オヤコ倍率も適用）
+          score = this.rate * -25 * oyaMultiplier;
+          anyWorst = true;
+        } else {
+          const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
+          score = this.rate * lastDrawValue * handCountMultiplier * oyaMultiplier;
+        }
         this.winners.push({
           playerId: dobonInfo.playerId,
           playerName: dobonInfo.playerName,
           handCount: dobonInfo.handCount,
           finalScore: score,
           isOya,
+          isWorst,
         });
+      }
+      // ワースト発生時は敗者情報にもフラグを立てる（演出用）
+      if (anyWorst && this.loser) {
+        this.loser.isWorst = true;
       }
     }
 

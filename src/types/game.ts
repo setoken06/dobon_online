@@ -18,6 +18,7 @@ export interface WinnerInfo {
   isDobonGaeshi?: boolean;
   gaeshiMultiplier?: number;
   isOya?: boolean;
+  isWorst?: boolean; // 2枚上がり×ラストドロー1で発動するワースト判定（ペナルティ）
 }
 
 // 敗者情報（ドボンされたプレイヤー）
@@ -25,6 +26,7 @@ export interface LoserInfo {
   playerId: string;
   playerName: string;
   isTsumoDobon: boolean;  // ツモドボンかどうか
+  isWorst?: boolean;       // ワースト発動時のフラグ（演出用）
 }
 
 // 初期レートボーナス情報

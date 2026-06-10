@@ -60,6 +60,9 @@ export function GameResult({
   // オナニー成功判定：ツモドボンで、自分がカードを切った場合
   const isOnaniiSuccess = loser?.isTsumoDobon && loser?.playerId === playerId && isWinner;
 
+  // ワースト判定: 2枚上がり×ラストドロー1で発動するペナルティ
+  const isWorst = (winners?.some(w => w.isWorst)) || loser?.isWorst === true;
+
   // ドボンされたプレイヤーの表示名を決定
   const getLoserDisplayName = (): string | null => {
     if (!loser) return null;
@@ -70,20 +73,34 @@ export function GameResult({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-2">
-      <div className="bg-white rounded-2xl p-4 md:p-8 max-w-md w-full mx-2 text-center shadow-2xl max-h-[95vh] overflow-y-auto">
-        <div className="text-4xl md:text-6xl mb-2 md:mb-4">{isWinner ? '🎉' : '😢'}</div>
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-1 md:mb-2">
-          {isWinner ? '勝利！' : 'ゲーム終了'}
-        </h2>
-        <p className="text-lg md:text-xl text-gray-600 mb-3">
-          {isWinner
-            ? hasMultipleWinners
-              ? '複数プレイヤーがドボン！'
-              : 'おめでとうございます！'
-            : hasMultipleWinners
-              ? `${winners?.map(w => w.playerName).join(', ')} の勝利です`
-              : `${winnerName} の勝利です`}
-        </p>
+      <div className={`bg-white rounded-2xl p-4 md:p-8 max-w-md w-full mx-2 text-center shadow-2xl max-h-[95vh] overflow-y-auto ${isWorst ? 'ring-4 ring-red-500 animate-pulse' : ''}`}>
+        {isWorst ? (
+          <>
+            <div className="text-4xl md:text-6xl mb-2 md:mb-4">💀</div>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-red-600 mb-1 md:mb-2 tracking-wider">
+              ワースト発動！
+            </h2>
+            <p className="text-sm text-gray-600 mb-3">
+              2枚上がり × ラストドロー「1」のペナルティ
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="text-4xl md:text-6xl mb-2 md:mb-4">{isWinner ? '🎉' : '😢'}</div>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-1 md:mb-2">
+              {isWinner ? '勝利！' : 'ゲーム終了'}
+            </h2>
+            <p className="text-lg md:text-xl text-gray-600 mb-3">
+              {isWinner
+                ? hasMultipleWinners
+                  ? '複数プレイヤーがドボン！'
+                  : 'おめでとうございます！'
+                : hasMultipleWinners
+                  ? `${winners?.map(w => w.playerName).join(', ')} の勝利です`
+                  : `${winnerName} の勝利です`}
+            </p>
+          </>
+        )}
 
         {/* ドボンされたプレイヤー表示 */}
         {loserDisplayName && (
@@ -127,13 +144,22 @@ export function GameResult({
 
         {/* ラストドロー表示 */}
         {lastDrawCards && lastDrawCards.length > 0 && (
-          <div className="mb-3">
-            <p className="text-sm text-gray-500 mb-2">ラストドロー</p>
+          <div className={`mb-3 ${isWorst ? 'p-3 rounded-lg bg-gradient-to-r from-red-100 to-orange-100 border-2 border-red-400' : ''}`}>
+            <p className={`text-sm mb-2 ${isWorst ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+              {isWorst ? '💀 ラストドロー（ワースト判定）💀' : 'ラストドロー'}
+            </p>
             <div className="flex justify-center gap-2 flex-wrap">
               {lastDrawCards.map((card) => (
-                <Card key={card.id} card={card} size="sm" disabled />
+                <div key={card.id} className={isWorst && card.rank === 1 ? 'ring-2 ring-red-500 rounded-md animate-pulse' : ''}>
+                  <Card card={card} size="sm" disabled />
+                </div>
               ))}
             </div>
+            {isWorst && (
+              <p className="text-xs text-red-600 mt-2 font-bold">
+                ⚠️ ワースト: ドボン者にレート × -25 のペナルティ
+              </p>
+            )}
           </div>
         )}
 
@@ -170,10 +196,18 @@ export function GameResult({
         ) : (
           /* 単独勝者のスコア表示 */
           finalScore !== undefined && (
-            <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-lg p-3 md:p-4 mb-4">
-              <p className="text-sm text-gray-600 mb-1">勝利点</p>
-              <p className="text-2xl md:text-3xl font-bold text-orange-600">{finalScore.toLocaleString()} EVJ</p>
-              {winners?.[0]?.isDobonGaeshi ? (
+            <div className={`rounded-lg p-3 md:p-4 mb-4 ${isWorst ? 'bg-gradient-to-r from-red-100 to-red-200' : 'bg-gradient-to-r from-yellow-100 to-orange-100'}`}>
+              <p className={`text-sm mb-1 ${isWorst ? 'text-red-700 font-bold' : 'text-gray-600'}`}>
+                {isWorst ? '💀 ペナルティ' : '勝利点'}
+              </p>
+              <p className={`text-2xl md:text-3xl font-bold ${isWorst ? 'text-red-700' : 'text-orange-600'}`}>
+                {finalScore.toLocaleString()} EVJ
+              </p>
+              {isWorst ? (
+                <p className="text-xs text-red-600 mt-1 font-semibold">
+                  {rate} EVJ × -25倍（ワースト ・ 2枚×ラストドロー1）
+                </p>
+              ) : winners?.[0]?.isDobonGaeshi ? (
                 <p className="text-xs text-gray-500 mt-1">
                   {rate} EVJ × {lastDrawValue} × {winners[0].gaeshiMultiplier}倍（ドボン返し 🔄）
                 </p>
