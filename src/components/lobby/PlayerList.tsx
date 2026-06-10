@@ -1,6 +1,6 @@
 'use client';
 
-import { Room } from '../../types/room';
+import { Room, GameHistoryEntry } from '../../types/room';
 
 interface PlayerListProps {
   room: Room;
@@ -10,9 +10,40 @@ interface PlayerListProps {
   onLeaveRoom: () => void;
 }
 
+// 対戦履歴からプレイヤー間の純フロー（個人間総合成績）を算出
+// - 同じ A→B が複数あれば加算
+// - A→B と B→A は相殺
+// - 異なるペア（A→B と A→C）は別カウント
+function computePairSummary(history: GameHistoryEntry[]): { from: string; to: string; net: number }[] {
+  const pairs = new Map<string, { playerA: string; playerB: string; netAtoB: number }>();
+  for (const entry of history) {
+    if (!entry.loserName) continue;
+    for (const winner of entry.winners) {
+      if (winner.playerName === entry.loserName) continue; // オナニーなど自己完結はスキップ
+      const sorted = [winner.playerName, entry.loserName].sort();
+      const key = `${sorted[0]}${sorted[1]}`;
+      // winner が playerA(辞書順小) なら + winner.score、playerB なら - winner.score
+      const delta = winner.playerName === sorted[0] ? winner.score : -winner.score;
+      const cur = pairs.get(key) ?? { playerA: sorted[0], playerB: sorted[1], netAtoB: 0 };
+      cur.netAtoB += delta;
+      pairs.set(key, cur);
+    }
+  }
+  const out: { from: string; to: string; net: number }[] = [];
+  for (const { playerA, playerB, netAtoB } of pairs.values()) {
+    if (netAtoB > 0) out.push({ from: playerA, to: playerB, net: netAtoB });
+    else if (netAtoB < 0) out.push({ from: playerB, to: playerA, net: -netAtoB });
+    // 完全に相殺された(0)ペアは省略
+  }
+  // 移動額の大きい順
+  out.sort((a, b) => b.net - a.net);
+  return out;
+}
+
 export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, onLeaveRoom }: PlayerListProps) {
   const isHost = room.hostId === playerId;
   const canStart = room.players.length >= room.minPlayers;
+  const pairSummary = room.gameHistory ? computePairSummary(room.gameHistory) : [];
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-green-900 p-4">
@@ -77,6 +108,32 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
           <p className="text-center text-gray-500 mb-4">
             あと{room.minPlayers - room.players.length}人で開始できます
           </p>
+        )}
+
+        {/* 個人間の総合成績（履歴を集計、A→Bが純流入額） */}
+        {pairSummary.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-3">
+              総合成績
+            </h3>
+            <div className="bg-amber-50 rounded-lg p-3 space-y-1.5 border border-amber-200">
+              {pairSummary.map((p, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between gap-2 px-3 py-1.5 bg-white rounded text-sm border border-amber-100"
+                >
+                  <span className="text-gray-700 truncate flex-1">
+                    <span className="font-semibold text-orange-700">{p.from}</span>
+                    <span className="mx-1 text-amber-600">→</span>
+                    <span className="text-gray-700">{p.to}</span>
+                  </span>
+                  <span className="font-bold whitespace-nowrap text-orange-700">
+                    {p.net.toLocaleString()} EVJ
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* セッション内の対戦履歴（このルームが残っている間のみ保持） */}
