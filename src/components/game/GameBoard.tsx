@@ -413,9 +413,9 @@ export function GameBoard({
         </div>
       )}
 
-      {/* ドボン可能時のオーバーレイ */}
+      {/* ドボン可能時のオーバーレイ（盤面を確認できるようぼかしなし・暗幕も薄め） */}
       {gameState.canDobon && !isFinished && (
-        <div className="fixed inset-0 bg-[#0d1015]/75 backdrop-blur-sm flex items-center justify-center z-30">
+        <div className="fixed inset-0 bg-[#0d1015]/30 flex items-center justify-center z-30">
           <div className="bg-surface rounded-3xl p-8 elev-lg border border-line text-center anim-pop max-w-xs w-full mx-4">
             <span className="inline-block w-10 h-1 rounded-full bg-danger mb-4" />
             <h2 className="text-2xl font-semibold text-ink mb-1 tracking-tight">ドボン！</h2>
