@@ -110,6 +110,21 @@ body {
   0%, 100% { opacity: 0.55; }
   50% { opacity: 1; }
 }
+/* 上品なアナウンス演出：登場→ホールド→フェードアウト（バウンス/グローなし） */
+@keyframes announceReveal {
+  0%   { opacity: 0; transform: translateY(10px) scale(1.08); letter-spacing: 0.12em; }
+  14%  { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0.02em; }
+  82%  { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0.02em; }
+  100% { opacity: 0; transform: translateY(-6px) scale(0.99); letter-spacing: 0.02em; }
+}
+@keyframes barReveal {
+  0%   { opacity: 0; transform: scaleX(0); }
+  16%  { opacity: 1; transform: scaleX(1); }
+  82%  { opacity: 1; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1); }
+}
+.anim-announce { animation: announceReveal 1.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-announce-bar { animation: barReveal 1.9s cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: center; }
 
 .anim-fade-up { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .anim-pop { animation: popIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }

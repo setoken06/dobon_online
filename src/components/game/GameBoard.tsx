@@ -472,40 +472,32 @@ export function GameBoard({
         </div>
       )}
 
-      {/* 文字演出オーバーレイ */}
+      {/* 文字演出オーバーレイ（ドボン/ツモドボン/ドボン返し） */}
       {announcement && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-          <div className="animate-bounce">
+          {/* 中央に集中させる控えめなビネット */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,10,14,0.55),transparent_62%)]" />
+          <div className="relative flex flex-col items-center anim-announce">
+            <span className={`mb-4 h-[3px] w-14 rounded-full anim-announce-bar ${gameState.isDobonGaeshi ? 'bg-accent' : 'bg-danger'}`} />
             <h1
-              className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_0_30px_rgba(255,0,0,0.8)]"
-              style={{
-                textShadow: '0 0 20px rgba(255,50,50,0.9), 0 0 60px rgba(255,0,0,0.5), 0 4px 8px rgba(0,0,0,0.5)',
-                animation: 'announcePulse 0.5s ease-in-out',
-              }}
+              className="text-5xl md:text-7xl font-semibold tracking-tight text-white"
+              style={{ textShadow: '0 4px 24px rgba(0,0,0,0.55)' }}
             >
               {announcement}
             </h1>
           </div>
-          <style>{`
-            @keyframes announcePulse {
-              0% { transform: scale(0.3); opacity: 0; }
-              50% { transform: scale(1.2); opacity: 1; }
-              100% { transform: scale(1); opacity: 1; }
-            }
-          `}</style>
         </div>
       )}
 
       {/* 見逃し演出オーバーレイ（初回見逃しのみ表示） */}
       {minogashiText && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-          <div className="animate-bounce">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,10,14,0.5),transparent_62%)]" />
+          <div className="relative flex flex-col items-center anim-announce">
+            <span className="mb-4 h-[3px] w-14 rounded-full bg-[#e3b53b] anim-announce-bar" />
             <h1
-              className="text-5xl md:text-7xl font-black text-yellow-300 whitespace-pre-line text-center"
-              style={{
-                textShadow: '0 0 20px rgba(255,200,0,0.9), 0 0 60px rgba(255,150,0,0.5), 0 4px 8px rgba(0,0,0,0.5)',
-                animation: 'announcePulse 0.5s ease-in-out',
-              }}
+              className="text-4xl md:text-6xl font-semibold tracking-tight text-white whitespace-pre-line text-center leading-[1.15]"
+              style={{ textShadow: '0 4px 24px rgba(0,0,0,0.55)' }}
             >
               {minogashiText}
             </h1>
@@ -617,10 +609,11 @@ export function GameBoard({
             </div>
             {/* めくり演出テキスト */}
             {lastDrawAnnouncement && (
-              <div className="animate-bounce">
+              <div className="flex flex-col items-center anim-announce">
+                <span className="mb-3 h-[3px] w-12 rounded-full bg-[#e3b53b] anim-announce-bar" />
                 {lastDrawAnnouncement.split('\n').map((line, i) => (
-                  <span key={i} className="block text-5xl font-black text-yellow-300 drop-shadow-[0_0_20px_rgba(255,200,0,0.8)]"
-                    style={{ textShadow: '0 0 20px rgba(255,200,0,0.9), 0 4px 8px rgba(0,0,0,0.5)' }}>
+                  <span key={i} className="block text-4xl md:text-5xl font-semibold tracking-tight text-white text-center leading-[1.15]"
+                    style={{ textShadow: '0 4px 24px rgba(0,0,0,0.55)' }}>
                     {line}
                   </span>
                 ))}
