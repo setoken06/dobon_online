@@ -5,6 +5,8 @@ import { GameMode } from '../../src/types/card';
 export class RoomStore {
   private rooms: Map<string, Room> = new Map();
   private games: Map<string, GameManager> = new Map();
+  // 履歴を記録済みのゲームインスタンス（多重記録防止）
+  private recordedGames: WeakSet<GameManager> = new WeakSet();
 
   createRoom(
     roomId: string,
@@ -107,9 +109,12 @@ export class RoomStore {
   }
 
   // 対戦履歴を記録（メモリ上のみ、部屋削除で消失）
+  // 同一ゲームに対して複数の終了経路（advanceDobonPhase / backToLobby）から
+  // 呼ばれても多重記録しないよう冪等にしている。
   recordGameHistory(roomId: string, game: GameManager): void {
     const room = this.rooms.get(roomId);
     if (!room) return;
+    if (this.recordedGames.has(game)) return; // 記録済みならスキップ
     const winnerInfo = game.getWinner();
     const winners = winnerInfo.winners;
     if (!winners || winners.length === 0) return;
@@ -121,12 +126,14 @@ export class RoomStore {
       loserName: loser?.playerName ?? null,
       totalScore,
       timestamp: Date.now(),
+      playerNames: room.players.map(p => p.name),
       isDobonGaeshi: winners.some(w => w.isDobonGaeshi),
       isWorst: winners.some(w => w.isWorst),
       isOnanii,
     };
     if (!room.gameHistory) room.gameHistory = [];
     room.gameHistory.push(entry);
+    this.recordedGames.add(game);
   }
 
   // セッションIDでプレイヤーを検索

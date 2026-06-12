@@ -541,6 +541,15 @@ app.prepare().then(() => {
           return;
         }
 
+        // 念のためここでも対戦履歴を記録（冪等）。
+        // ドボン演出フェーズの進行はドボン成功者しか行えないため、
+        // ホストが勝者でない場合は advanceDobonPhase 経由で記録されない。
+        // 待機画面に戻る操作は必ず行われるので、この経路で取りこぼしを防ぐ。
+        const finishedGame = roomStore.getGame(roomId);
+        if (finishedGame) {
+          roomStore.recordGameHistory(roomId, finishedGame);
+        }
+
         // ゲームを削除して待機状態に戻す
         roomStore.setRoomStatus(roomId, 'waiting');
 

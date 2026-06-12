@@ -16,19 +16,39 @@ interface PlayerListProps {
 // - 異なるペア（A→B と A→C）は別カウント
 function computePairSummary(history: GameHistoryEntry[]): { from: string; to: string; net: number }[] {
   const pairs = new Map<string, { playerA: string; playerB: string; netAtoB: number }>();
+
+  // winner が loser から amount を受け取る関係を加算
+  const addFlow = (winnerName: string, loserName: string, amount: number) => {
+    if (winnerName === loserName || amount === 0) return;
+    const sorted = [winnerName, loserName].sort();
+    const key = `${sorted[0]}\u0000${sorted[1]}`;
+    // winner が playerA(辞書順小) なら + amount、playerB なら - amount
+    const delta = winnerName === sorted[0] ? amount : -amount;
+    const cur = pairs.get(key) ?? { playerA: sorted[0], playerB: sorted[1], netAtoB: 0 };
+    cur.netAtoB += delta;
+    pairs.set(key, cur);
+  };
+
   for (const entry of history) {
+    if (entry.isOnanii) {
+      // オナニー上がり: 敗者が一人に定まらないため、勝者の額を勝者以外の
+      // 参加者全員で均等に負担する（2人なら相手1人が全額負担）。
+      const names = entry.playerNames;
+      if (!names || names.length < 2) continue; // 参加者不明（旧データ等）はスキップ
+      for (const winner of entry.winners) {
+        const others = names.filter(n => n !== winner.playerName);
+        if (others.length === 0) continue;
+        const share = winner.score / others.length;
+        for (const other of others) addFlow(winner.playerName, other, share);
+      }
+      continue;
+    }
     if (!entry.loserName) continue;
     for (const winner of entry.winners) {
-      if (winner.playerName === entry.loserName) continue; // オナニーなど自己完結はスキップ
-      const sorted = [winner.playerName, entry.loserName].sort();
-      const key = `${sorted[0]}${sorted[1]}`;
-      // winner が playerA(辞書順小) なら + winner.score、playerB なら - winner.score
-      const delta = winner.playerName === sorted[0] ? winner.score : -winner.score;
-      const cur = pairs.get(key) ?? { playerA: sorted[0], playerB: sorted[1], netAtoB: 0 };
-      cur.netAtoB += delta;
-      pairs.set(key, cur);
+      addFlow(winner.playerName, entry.loserName, winner.score);
     }
   }
+
   const out: { from: string; to: string; net: number }[] = [];
   for (const { playerA, playerB, netAtoB } of pairs.values()) {
     if (netAtoB > 0) out.push({ from: playerA, to: playerB, net: netAtoB });
@@ -197,7 +217,7 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
                             {winnerNames}
                           </span>
                           <span className="mx-1.5 text-muted">→</span>
-                          <span className="text-muted">{entry.loserName ?? '—'}</span>
+                          <span className="text-muted">{entry.isOnanii ? '全員' : (entry.loserName ?? '—')}</span>
                         </span>
                         <span className={`font-semibold whitespace-nowrap tabular-nums ${
                           entry.isWorst ? 'text-danger' : isPositive ? 'text-accent-ink' : 'text-muted'

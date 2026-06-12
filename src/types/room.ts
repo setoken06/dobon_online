@@ -22,6 +22,7 @@ export interface GameHistoryEntry {
   loserName: string | null;                          // 敗者名（オナニーや該当なしの場合は null）
   totalScore: number;                                // 勝者スコアの合計（=敗者の損失）
   timestamp: number;                                 // Date.now()
+  playerNames?: string[];                            // 参加者全員の名前（オナニー時の按分計算用）
   isDobonGaeshi?: boolean;
   isWorst?: boolean;
   isOnanii?: boolean;
