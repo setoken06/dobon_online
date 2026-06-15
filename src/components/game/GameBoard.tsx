@@ -142,7 +142,7 @@ export function GameBoard({
   useEffect(() => {
     if (gameState.minogashiPlayerName && gameState.minogashiPlayerName !== prevMinogashiRef.current) {
       prevMinogashiRef.current = gameState.minogashiPlayerName;
-      setMinogashiText(`${gameState.minogashiPlayerName} 見逃し！\nレート×2`);
+      setMinogashiText(`${gameState.minogashiPlayerName} 見逃し！\nストック+1`);
       if (minogashiTimerRef.current) clearTimeout(minogashiTimerRef.current);
       minogashiTimerRef.current = setTimeout(() => {
         setMinogashiText(null);
@@ -773,6 +773,8 @@ export function GameBoard({
             selectedCardIds={selectedCardIds}
             playableCardIds={playableCardIds}
             onCardSelect={handleCardSelect}
+            exposedCardIds={new Set((myPlayer.exposedCards ?? []).map((c) => c.id))}
+            stock={myPlayer.stock ?? 0}
           />
         )}
       </div>

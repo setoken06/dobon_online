@@ -10,6 +10,10 @@ interface InternalPlayerState {
   hand: Card[];
   isReach: boolean;
   myMark?: MyMark;
+  // 見逃しで貯まるストック（上がった時にラストドロー枚数が +stock される）
+  stock: number;
+  // 見逃しで表側公開された手札のカードID（捨てられるまで公開され続ける）
+  exposedCardIds: Set<string>;
 }
 
 // ドボンしたプレイヤー情報
@@ -80,6 +84,8 @@ export class GameManager {
       hand: [],
       isReach: false,
       myMark: p.myMark,
+      stock: 0,
+      exposedCardIds: new Set<string>(),
     }));
 
     // 手札を配る
@@ -460,6 +466,10 @@ export class GameManager {
       cardCount: p.hand.length,
       hand: p.playerId === playerId || winnerPlayerIdSet?.has(p.playerId) ? p.hand : undefined,
       isReach: p.isReach,
+      // 見逃しストック（プレイヤー名と一緒に常時表示する）
+      stock: p.stock,
+      // 表側公開された手札（全員に見える公開情報）。相手のはこれだけ表向きで描画する。
+      exposedCards: p.hand.filter(c => p.exposedCardIds.has(c.id)),
     }));
 
     const canDobon = this.dobonablePlayerIds.has(playerId);
@@ -731,6 +741,8 @@ export class GameManager {
     for (const card of cards) {
       const cardIndex = currentPlayer.hand.findIndex(c => c.id === card.id);
       currentPlayer.hand.splice(cardIndex, 1);
+      // 表側公開カードは捨てられたらリセット（再度引いても表向きにはならない）
+      currentPlayer.exposedCardIds.delete(card.id);
       this.discardPile.push(card);
     }
 
@@ -1031,18 +1043,18 @@ export class GameManager {
     this.playersWhoSkippedDobon.add(playerId);
     this.dobonablePlayerIds.delete(playerId);
 
-    // 見逃しの効果は「このプレイヤーがこのゲームで初めての見逃し」の時だけ適用
-    // - 1回目: レート×2 + 見逃し演出
-    // - 2回目以降: 何も起きない（演出も発生せず、他プレイヤーから見ても判別不可）
-    // 2ドローは新仕様で廃止
-    const isFirstSkipForPlayer = !this.playersWhoEverSkippedDobon.has(playerId);
+    // 見逃し新仕様（旧レート×2は廃止）:
+    // - 見逃すたびに、そのプレイヤーのストック +1
+    // - 見逃した瞬間の手札を表側公開（追加で引くカードは対象外。捨てられるとリセット）
     this.playersWhoEverSkippedDobon.add(playerId);
-
-    if (isFirstSkipForPlayer) {
-      this.rate *= 2;
-      this.minogashiPlayerName = player?.playerName;
-      this.minogashiRateApplied = true;
+    if (player) {
+      player.stock += 1;
+      for (const c of player.hand) {
+        player.exposedCardIds.add(c.id);
+      }
     }
+    this.minogashiPlayerName = player?.playerName;
+    this.minogashiRateApplied = true; // 見逃し演出トリガ（表示は「ストック+1」）
 
     if (this.dobonablePlayerIds.size === 0) {
       return this.resolveDobonPhase();
@@ -1178,16 +1190,23 @@ export class GameManager {
 
   // スコア計算
   private calculateFinalScores(): void {
-    const lastNonJokerCard = this.gameMode === 'uno'
-      ? this.lastDrawCards.find(c => !isWildCard(c))
-      : this.lastDrawCards.find(c => !isJokerCard(c));
-    const lastDrawValue = lastNonJokerCard
-      ? (this.gameMode === 'uno' ? this.getLastDrawCardValue(lastNonJokerCard) : this.getCardValue(lastNonJokerCard))
-      : 0;
+    // ラストドローの「本カード（非ジョーカー）」を全部評価して合計する。
+    // 各カードの実効値: 値が1のカードはワースト扱いで -25、それ以外はカード値。
+    // 例) レート400・3枚上がり・[1,4] → 400×3×(-25) + 400×3×4 = 400×3×(-25+4)
+    const nonJokerCards = this.gameMode === 'uno'
+      ? this.lastDrawCards.filter(c => !isWildCard(c))
+      : this.lastDrawCards.filter(c => !isJokerCard(c));
+    const cardValueOf = (c: Card) =>
+      this.gameMode === 'uno' ? this.getLastDrawCardValue(c) : this.getCardValue(c);
+    const sumEffValue = nonJokerCards.reduce(
+      (s, c) => s + (cardValueOf(c) === 1 ? -25 : cardValueOf(c)),
+      0
+    );
+    const hasWorst = nonJokerCards.some(c => cardValueOf(c) === 1);
 
     if (this.pendingDobonIsGaeshi && this.pendingGaeshiTotalMultiplier !== undefined) {
       const gaeshiWinner = this.pendingDobonWinners[0];
-      const score = this.rate * lastDrawValue * this.pendingGaeshiTotalMultiplier;
+      const score = this.rate * sumEffValue * this.pendingGaeshiTotalMultiplier;
       this.winners = [{
         playerId: gaeshiWinner.playerId,
         playerName: gaeshiWinner.playerName,
@@ -1195,32 +1214,24 @@ export class GameManager {
         finalScore: score,
         isDobonGaeshi: true,
         gaeshiMultiplier: this.pendingGaeshiTotalMultiplier,
+        isWorst: hasWorst,
       }];
+      if (hasWorst && this.loser) this.loser.isWorst = true;
     } else {
       this.winners = [];
-      let anyWorst = false;
       for (const dobonInfo of this.pendingDobonWinners) {
-        // ワースト判定: 2枚上がり × ラストドロー1
-        const isWorst = dobonInfo.handCount === 2 && lastDrawValue === 1;
-        let score: number;
-        if (isWorst) {
-          // ペナルティ: レート×-25
-          score = this.rate * -25;
-          anyWorst = true;
-        } else {
-          const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
-          score = this.rate * lastDrawValue * handCountMultiplier;
-        }
+        const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
+        const score = this.rate * sumEffValue * handCountMultiplier;
         this.winners.push({
           playerId: dobonInfo.playerId,
           playerName: dobonInfo.playerName,
           handCount: dobonInfo.handCount,
           finalScore: score,
-          isWorst,
+          isWorst: hasWorst,
         });
       }
-      // ワースト発生時は敗者情報にもフラグを立てる（演出用）
-      if (anyWorst && this.loser) {
+      // ワースト（値1）が混じった場合は敗者情報にもフラグ（演出用）
+      if (hasWorst && this.loser) {
         this.loser.isWorst = true;
       }
     }
@@ -1285,8 +1296,17 @@ export class GameManager {
       }
     };
 
+    // 上がったプレイヤーのストック分だけ「本カード（非ジョーカー）」の枚数を増やす。
+    // デフォルト1枚 + ストック数。複数勝者（ダブルドボン等）は最大ストックを採用。
+    const winnerStock = this.pendingDobonWinners.reduce((mx, w) => {
+      const p = this.findPlayer(w.playerId);
+      return Math.max(mx, p?.stock ?? 0);
+    }, 0);
+    const targetNonJoker = 1 + winnerStock;
+
     refillForLastDraw();
 
+    let nonJokerCount = 0;
     let lastDrawCard = this.deck.draw();
     while (lastDrawCard) {
       this.lastDrawCards.push(lastDrawCard);
@@ -1294,13 +1314,15 @@ export class GameManager {
       const isJokerLike = this.gameMode === 'uno' ? isWildCard(lastDrawCard) : isJokerCard(lastDrawCard);
 
       if (isJokerLike) {
-        // ジョーカー/ワイルドならレート*2してもう一枚引く
+        // ジョーカー/ワイルドならレート×2（本カードにはカウントしない）
         this.rate *= 2;
-        refillForLastDraw();
-        lastDrawCard = this.deck.draw();
       } else {
-        break;
+        nonJokerCount += 1;
+        if (nonJokerCount >= targetNonJoker) break;
       }
+
+      refillForLastDraw();
+      lastDrawCard = this.deck.draw();
     }
 
     // フォールバック: 山札も捨て札も全て手札にあって空のまま終わった場合、
