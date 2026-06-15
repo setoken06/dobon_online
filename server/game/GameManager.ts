@@ -1191,22 +1191,33 @@ export class GameManager {
   // スコア計算
   private calculateFinalScores(): void {
     // ラストドローの「本カード（非ジョーカー）」を全部評価して合計する。
-    // 各カードの実効値: 値が1のカードはワースト扱いで -25、それ以外はカード値。
-    // 例) レート400・3枚上がり・[1,4] → 400×3×(-25) + 400×3×4 = 400×3×(-25+4)
+    // 各カードの実効値はカード値。ただし「2枚上がり」の時のみ、値1のカードはワースト -25。
+    // （ワーストは2枚上がり限定。他の上がり枚数では値1も単に値1として加算）
     const nonJokerCards = this.gameMode === 'uno'
       ? this.lastDrawCards.filter(c => !isWildCard(c))
       : this.lastDrawCards.filter(c => !isJokerCard(c));
     const cardValueOf = (c: Card) =>
       this.gameMode === 'uno' ? this.getLastDrawCardValue(c) : this.getCardValue(c);
-    const sumEffValue = nonJokerCards.reduce(
-      (s, c) => s + (cardValueOf(c) === 1 ? -25 : cardValueOf(c)),
-      0
-    );
-    const hasWorst = nonJokerCards.some(c => cardValueOf(c) === 1);
+    // 上がり枚数に応じた合計実効値とワースト判定（ワーストは handCount===2 のみ）
+    const evalFor = (handCount: number): { sum: number; worst: boolean } => {
+      let sum = 0;
+      let worst = false;
+      for (const c of nonJokerCards) {
+        const v = cardValueOf(c);
+        if (handCount === 2 && v === 1) {
+          sum += -25;
+          worst = true;
+        } else {
+          sum += v;
+        }
+      }
+      return { sum, worst };
+    };
 
     if (this.pendingDobonIsGaeshi && this.pendingGaeshiTotalMultiplier !== undefined) {
       const gaeshiWinner = this.pendingDobonWinners[0];
-      const score = this.rate * sumEffValue * this.pendingGaeshiTotalMultiplier;
+      const { sum, worst } = evalFor(gaeshiWinner.handCount);
+      const score = this.rate * sum * this.pendingGaeshiTotalMultiplier;
       this.winners = [{
         playerId: gaeshiWinner.playerId,
         playerName: gaeshiWinner.playerName,
@@ -1214,24 +1225,27 @@ export class GameManager {
         finalScore: score,
         isDobonGaeshi: true,
         gaeshiMultiplier: this.pendingGaeshiTotalMultiplier,
-        isWorst: hasWorst,
+        isWorst: worst,
       }];
-      if (hasWorst && this.loser) this.loser.isWorst = true;
+      if (worst && this.loser) this.loser.isWorst = true;
     } else {
       this.winners = [];
+      let anyWorst = false;
       for (const dobonInfo of this.pendingDobonWinners) {
+        const { sum, worst } = evalFor(dobonInfo.handCount);
         const handCountMultiplier = this.getHandCountMultiplier(dobonInfo.handCount);
-        const score = this.rate * sumEffValue * handCountMultiplier;
+        const score = this.rate * sum * handCountMultiplier;
+        if (worst) anyWorst = true;
         this.winners.push({
           playerId: dobonInfo.playerId,
           playerName: dobonInfo.playerName,
           handCount: dobonInfo.handCount,
           finalScore: score,
-          isWorst: hasWorst,
+          isWorst: worst,
         });
       }
-      // ワースト（値1）が混じった場合は敗者情報にもフラグ（演出用）
-      if (hasWorst && this.loser) {
+      // ワースト（2枚上がり×値1）発生時は敗者情報にもフラグ（演出用）
+      if (anyWorst && this.loser) {
         this.loser.isWorst = true;
       }
     }
