@@ -11,7 +11,6 @@ interface OpponentHandProps {
 
 export function OpponentHand({ player, isCurrentTurn, isDisconnected }: OpponentHandProps) {
   const exposed = player.exposedCards ?? [];
-  const stock = player.stock ?? 0;
   // 表示は最大7枚。表向き公開カードを優先表示し、残りを裏向きで埋める。
   const exposedShown = exposed.slice(0, 7);
   const backCount = Math.max(0, player.cardCount - exposed.length);
@@ -43,12 +42,6 @@ export function OpponentHand({ player, isCurrentTurn, isDisconnected }: Opponent
         <span className={`text-sm font-medium ${isDisconnected ? 'text-white/45' : 'text-white'}`}>
           {player.playerName}
         </span>
-        {/* ストック表示（名前と一緒に常時表示） */}
-        {stock > 0 && (
-          <span className="bg-[#c9483f] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums">
-            ストック{stock}
-          </span>
-        )}
       </div>
       <div className="flex gap-1">
         {exposedShown.map((c) => (
