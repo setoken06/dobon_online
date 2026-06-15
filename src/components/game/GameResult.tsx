@@ -50,6 +50,34 @@ export function GameResult({
     return count;
   };
 
+  // ラストドローの本カード（ジョーカー/ワイルド以外）一覧
+  const cardVal = (c: CardType) => (c.unoSpecial ? 10 : c.rank);
+  const lastDrawNonJoker = (lastDrawCards ?? []).filter(c => !isJokerCard(c) && !isWildCard(c));
+  // ラストドロー各カードの式パーツ（2枚上がりの時だけ値1は -25）
+  const formulaParts = (handCount: number, multiplier: number) =>
+    lastDrawNonJoker.map((c) => {
+      const v = cardVal(c);
+      const eff = handCount === 2 && v === 1 ? -25 : v;
+      return { eff, sub: rate * eff * multiplier };
+    });
+  // 計算式の表示（複数枚なら1枚ごとに改行して合計も表示）
+  const renderFormula = (handCount: number, multiplier: number, suffix: string, cls: string) => {
+    const parts = formulaParts(handCount, multiplier);
+    if (parts.length <= 1) {
+      const eff = parts[0]?.eff ?? lastDrawValue;
+      return <p className={cls}>{rate} EVJ × {eff} × {multiplier}倍{suffix}</p>;
+    }
+    const total = parts.reduce((s, p) => s + p.sub, 0);
+    return (
+      <div className={`${cls} space-y-0.5`}>
+        {parts.map((p, i) => (
+          <p key={i}>{rate} × {p.eff} × {multiplier}倍 = {p.sub.toLocaleString()}</p>
+        ))}
+        <p className="font-medium">合計 {total.toLocaleString()} EVJ{suffix}</p>
+      </div>
+    );
+  };
+
   // 複数勝者がいる場合
   const hasMultipleWinners = winners && winners.length > 1;
 
@@ -181,9 +209,12 @@ export function GameResult({
                     <p className="text-lg font-semibold text-ink tabular-nums">
                       {winner.finalScore.toLocaleString()} <span className="text-xs text-muted font-normal">EVJ</span>
                     </p>
-                    <p className="text-[11px] text-muted">
-                      {rate} × {lastDrawValue} × {multiplier}倍{winner.isDobonGaeshi ? '（ドボン返し）' : `（${winner.handCount}枚）`}
-                    </p>
+                    {renderFormula(
+                      winner.handCount,
+                      multiplier,
+                      winner.isDobonGaeshi ? '（ドボン返し）' : `（${winner.handCount}枚）`,
+                      'text-[11px] text-muted'
+                    )}
                   </div>
                 );
               })}
@@ -199,19 +230,19 @@ export function GameResult({
               <p className={`text-3xl md:text-4xl font-semibold tabular-nums ${isWorst ? 'text-danger' : 'text-ink'}`}>
                 {finalScore.toLocaleString()} <span className="text-sm text-muted font-normal">EVJ</span>
               </p>
-              {isWorst ? (
-                <p className="text-xs text-danger mt-1 font-medium">
-                  {rate} EVJ × -25倍（ワースト ・ 2枚×ラストドロー1）
-                </p>
-              ) : winners?.[0]?.isDobonGaeshi ? (
-                <p className="text-xs text-muted mt-1">
-                  {rate} EVJ × {lastDrawValue} × {winners[0].gaeshiMultiplier}倍（ドボン返し）
-                </p>
-              ) : (
-                <p className="text-xs text-muted mt-1">
-                  {rate} EVJ × {lastDrawValue} × {getHandCountMultiplier(winnerHandCount || 1)}倍（{winnerHandCount || 1}枚）
-                </p>
-              )}
+              {winners?.[0]?.isDobonGaeshi
+                ? renderFormula(
+                    winnerHandCount || 1,
+                    winners[0].gaeshiMultiplier || 0,
+                    '（ドボン返し）',
+                    `text-xs mt-1 ${isWorst ? 'text-danger font-medium' : 'text-muted'}`
+                  )
+                : renderFormula(
+                    winnerHandCount || 1,
+                    getHandCountMultiplier(winnerHandCount || 1),
+                    `（${winnerHandCount || 1}枚）`,
+                    `text-xs mt-1 ${isWorst ? 'text-danger font-medium' : 'text-muted'}`
+                  )}
             </div>
           )
         )}
