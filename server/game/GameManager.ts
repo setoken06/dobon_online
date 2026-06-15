@@ -33,8 +33,8 @@ export class GameManager {
   private dobonablePlayerIds: Set<string> = new Set();
   private playersWhoDoboned: Map<string, DobonPlayerInfo> = new Map();
   private playersWhoSkippedDobon: Set<string> = new Set();
-  // ゲーム全体を通して見逃しを1回以上した経験のあるプレイヤー
-  // 最初の見逃しのみレート×2が適用される（2回目以降は2ドローのみで倍率変動なし）
+  // ゲーム全体を通して見逃しを1回以上した経験のあるプレイヤー（参考用）
+  // レート×2は見逃すたびに毎回適用（無制限）
   private playersWhoEverSkippedDobon: Set<string> = new Set();
   private rate: number;
   private minogashiPlayerName?: string; // 見逃し演出用
@@ -1040,19 +1040,16 @@ export class GameManager {
 
     // 見逃し:
     // - 手札公開は毎回（見逃した瞬間の手札を表側に。追加で引くカードは対象外、捨てるとリセット）
-    // - レート×2 は「そのプレイヤーのそのゲーム初回の見逃し」のみ（旧仕様に復帰）
+    // - レート×2 は見逃すたびに毎回（無制限・初回限定ではない）
     if (player) {
       for (const c of player.hand) {
         player.exposedCardIds.add(c.id);
       }
     }
-    const isFirstSkipForPlayer = !this.playersWhoEverSkippedDobon.has(playerId);
     this.playersWhoEverSkippedDobon.add(playerId);
-    if (isFirstSkipForPlayer) {
-      this.rate *= 2;
-      this.minogashiPlayerName = player?.playerName;
-      this.minogashiRateApplied = true;
-    }
+    this.rate *= 2;
+    this.minogashiPlayerName = player?.playerName;
+    this.minogashiRateApplied = true;
 
     if (this.dobonablePlayerIds.size === 0) {
       return this.resolveDobonPhase();
