@@ -7,8 +7,7 @@ export interface PlayerGameState {
   cardCount: number;    // 他プレイヤーには枚数のみ公開
   hand?: Card[];        // 自分の手札のみ含まれる
   isReach: boolean;     // リーチ状態
-  stock?: number;       // 見逃しで貯まったストック（名前と一緒に常時表示）
-  exposedCards?: Card[];// 見逃しで表側公開された手札（全員に見える公開情報）
+  stock?: number;       // 見逃しストック（非公開：本人にだけ送られる）
 }
 
 // 勝者情報
@@ -90,6 +89,7 @@ export interface GameState {
   minogashiRateApplied?: boolean;           // 今回の見逃しでレート×2が適用されたか（初回のみtrue）
   passReachPlayerName?: string;             // リーチ中にパスしたプレイヤー（パ継/パ解演出）
   passReachKept?: boolean;                  // true=リーチ継続(パ継) / false=リーチ解除(パ解)
+  isLocked?: boolean;                       // 自分が見逃しロック中か（カードを出せない・ドボン不可）
   displayCurrentPlayerId?: string;          // ターン表示用のプレイヤーID（ドボン透け対策のため実際のcurrentPlayerIdと異なる場合あり）
 }
 

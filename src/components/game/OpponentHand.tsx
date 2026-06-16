@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardBack } from './Card';
+import { CardBack } from './Card';
 import { PlayerGameState } from '../../types/game';
 
 interface OpponentHandProps {
@@ -10,13 +10,6 @@ interface OpponentHandProps {
 }
 
 export function OpponentHand({ player, isCurrentTurn, isDisconnected }: OpponentHandProps) {
-  const exposed = player.exposedCards ?? [];
-  const stock = player.stock ?? 0;
-  // 表示は最大7枚。表向き公開カードを優先表示し、残りを裏向きで埋める。
-  const exposedShown = exposed.slice(0, 7);
-  const backCount = Math.max(0, player.cardCount - exposed.length);
-  const backShown = Math.min(backCount, Math.max(0, 7 - exposedShown.length));
-
   return (
     <div
       className={`
@@ -43,19 +36,10 @@ export function OpponentHand({ player, isCurrentTurn, isDisconnected }: Opponent
         <span className={`text-sm font-medium ${isDisconnected ? 'text-white/45' : 'text-white'}`}>
           {player.playerName}
         </span>
-        {/* ストック表示（名前と一緒に常時表示） */}
-        {stock > 0 && (
-          <span className="bg-[#c9483f] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums">
-            ストック{stock}
-          </span>
-        )}
       </div>
       <div className="flex gap-1">
-        {exposedShown.map((c) => (
-          <Card key={c.id} card={c} size="sm" disabled />
-        ))}
-        {Array.from({ length: backShown }).map((_, i) => (
-          <CardBack key={`b${i}`} size="sm" />
+        {Array.from({ length: Math.min(player.cardCount, 7) }).map((_, i) => (
+          <CardBack key={i} size="sm" />
         ))}
         {player.cardCount > 7 && (
           <span className="text-white/60 text-sm self-center ml-1 tabular-nums">

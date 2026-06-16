@@ -10,10 +10,10 @@ interface InternalPlayerState {
   hand: Card[];
   isReach: boolean;
   myMark?: MyMark;
-  // 見逃しで貯まるストック（上がった時にラストドロー枚数が +stock される）
+  // 見逃しで貯まるストック（非公開＝本人のみ表示）。上がった時にラストドロー枚数が +stock
   stock: number;
-  // 見逃しで表側公開された手札のカードID（捨てられるまで公開され続ける）
-  exposedCardIds: Set<string>;
+  // 見逃しで付与される残りロックターン数（>0 の間はカードを出せず・ドボン不可）
+  lockedTurns: number;
 }
 
 // ドボンしたプレイヤー情報
@@ -39,8 +39,9 @@ export class GameManager {
   // 見逃しはストック制：見逃すたびにそのプレイヤーのストック +1
   private playersWhoEverSkippedDobon: Set<string> = new Set();
   private rate: number;
-  private minogashiPlayerName?: string; // 見逃し演出用
-  private minogashiRateApplied?: boolean; // 直近の見逃しでレート×2が適用されたか
+  private minogashiPlayerName?: string; // 見逃し演出用（本人のみに送る）
+  private minogashiPlayerId?: string;   // 見逃したプレイヤーID（自分にだけ演出を見せるため）
+  private minogashiRateApplied?: boolean; // 旧仕様の名残（演出トリガとして流用）
   // パス時のリーチ継続/解除演出用
   private passReachPlayerName?: string; // リーチ中にパスしたプレイヤー名
   private passReachKept?: boolean;      // true=リーチ継続(パ継) / false=リーチ解除(パ解)
@@ -88,7 +89,7 @@ export class GameManager {
       isReach: false,
       myMark: p.myMark,
       stock: 0,
-      exposedCardIds: new Set<string>(),
+      lockedTurns: 0,
     }));
 
     // 手札を配る
@@ -218,6 +219,11 @@ export class GameManager {
       currentPlayer.isReach = true;
     } else {
       currentPlayer.isReach = false;
+    }
+
+    // 見逃しロックは、このプレイヤーのターンが終わる時に1減らす（＝1ターンで解除）
+    if (currentPlayer.lockedTurns > 0) {
+      currentPlayer.lockedTurns -= 1;
     }
 
     // UNOモードのターン方向対応
@@ -435,6 +441,8 @@ export class GameManager {
     if (!player) return false;
 
     if (!player.isReach) return false;
+    // 見逃しロック中はドボン不可
+    if (player.lockedTurns > 0) return false;
 
     // クラシック: ジョーカーではドボンできない
     if (this.gameMode === 'classic' && targetCardValue === 0) return false;
@@ -450,6 +458,8 @@ export class GameManager {
     const player = this.findPlayer(playerId);
     if (!player) return false;
     if (!player.isReach) return false;
+    // 見逃しロック中はドボン不可
+    if (player.lockedTurns > 0) return false;
 
     const winningNumbers = this.calculateWinningNumbers(player.hand);
     const specialValue = card.unoSpecial === 'draw2' ? -1 : card.unoSpecial === 'skip' ? -2 : -3;
@@ -469,10 +479,8 @@ export class GameManager {
       cardCount: p.hand.length,
       hand: p.playerId === playerId || winnerPlayerIdSet?.has(p.playerId) ? p.hand : undefined,
       isReach: p.isReach,
-      // 見逃しストック（プレイヤー名と一緒に常時表示する）
-      stock: p.stock,
-      // 表側公開された手札（全員に見える公開情報）。相手のはこれだけ表向きで描画する。
-      exposedCards: p.hand.filter(c => p.exposedCardIds.has(c.id)),
+      // 見逃しストックは非公開：本人にだけ送る（相手には undefined）
+      stock: p.playerId === playerId ? p.stock : undefined,
     }));
 
     const canDobon = this.dobonablePlayerIds.has(playerId);
@@ -549,8 +557,11 @@ export class GameManager {
       waitingForColorChoice: this.waitingForColorChoice || undefined,
       colorChoicePlayerId: this.colorChoicePlayerId,
       revealedLastDrawCount: this.dobonPhase === 'result' ? this.revealedLastDrawCount : undefined,
-      minogashiPlayerName: this.minogashiPlayerName,
-      minogashiRateApplied: this.minogashiRateApplied,
+      // 見逃し演出は本人にだけ見せる（相手には不可視）
+      minogashiPlayerName: this.minogashiPlayerId === playerId ? this.minogashiPlayerName : undefined,
+      minogashiRateApplied: this.minogashiPlayerId === playerId ? this.minogashiRateApplied : undefined,
+      // 自分がロック中か（カードを出せない・ドボン不可）
+      isLocked: (player?.lockedTurns ?? 0) > 0,
       passReachPlayerName: this.passReachPlayerName,
       passReachKept: this.passReachKept,
     };
@@ -688,6 +699,11 @@ export class GameManager {
       return { success: false, error: 'あなたのターンではありません' };
     }
 
+    // 見逃しロック中はカードを出せない（ドロー＆パスのみ）
+    if (currentPlayer.lockedTurns > 0) {
+      return { success: false, error: 'ロック中はカードを出せません' };
+    }
+
     if (cardIds.length === 0) {
       return { success: false, error: 'カードを選択してください' };
     }
@@ -741,6 +757,7 @@ export class GameManager {
 
     // 見逃し演出・パス演出をクリア
     this.minogashiPlayerName = undefined;
+    this.minogashiPlayerId = undefined;
     this.passReachPlayerName = undefined;
     this.passReachKept = undefined;
 
@@ -748,8 +765,6 @@ export class GameManager {
     for (const card of cards) {
       const cardIndex = currentPlayer.hand.findIndex(c => c.id === card.id);
       currentPlayer.hand.splice(cardIndex, 1);
-      // 表側公開カードは捨てられたらリセット（再度引いても表向きにはならない）
-      currentPlayer.exposedCardIds.delete(card.id);
       this.discardPile.push(card);
     }
 
@@ -909,7 +924,8 @@ export class GameManager {
     }
 
     // 手札が8枚以上で出せるカードがある場合、ドローできない（カードを出してスキップのみ）
-    if (!this.hasDrawnThisTurn && currentPlayer.hand.length >= 8) {
+    // ※ロック中は出せないので、この制限は適用しない（ドロー可）
+    if (!this.hasDrawnThisTurn && currentPlayer.hand.length >= 8 && currentPlayer.lockedTurns === 0) {
       const playableCards = this.getPlayableCards(playerId);
       if (playableCards.length > 0) {
         return { success: false, error: '手札が8枚以上で出せるカードがあります。カードを出してください' };
@@ -925,6 +941,7 @@ export class GameManager {
 
     // 見逃し演出・パス演出をクリア
     this.minogashiPlayerName = undefined;
+    this.minogashiPlayerId = undefined;
     this.passReachPlayerName = undefined;
     this.passReachKept = undefined;
 
@@ -1004,7 +1021,8 @@ export class GameManager {
       return { success: false, error: '先にカードを引いてください' };
     }
 
-    if (currentPlayer.hand.length >= 8) {
+    // ロック中は出せないので 8枚以上でもパス可
+    if (currentPlayer.hand.length >= 8 && currentPlayer.lockedTurns === 0) {
       const playableCards = this.getPlayableCards(playerId);
       if (playableCards.length > 0) {
         return { success: false, error: '手札が8枚以上の場合、出せるカードがあればパスできません' };
@@ -1064,17 +1082,21 @@ export class GameManager {
     this.dobonablePlayerIds.delete(playerId);
 
     // 見逃し:
-    // ストック制（旧レート×2は廃止）:
-    // - 見逃すたびにそのプレイヤーのストック +1
-    // - 手札公開は毎回（見逃した瞬間の手札を表側に。追加で引くカードは対象外、捨てるとリセット）
+    // 見逃し（相手には不可視）:
+    // - そのプレイヤーのストック +1（非公開）
+    // - 1ターンロックを付与（次の自分のターンはカードを出せず・ロック中はドボン不可）
     if (player) {
       player.stock += 1;
-      for (const c of player.hand) {
-        player.exposedCardIds.add(c.id);
-      }
+      // ロックは「次の自分のターン」を1回ぶん。
+      // ツモドボンの見逃し（＝自分のターン中の見逃し）は、この直後に自分のターンが
+      // 終わって nextTurn で1減るため、相殺ぶんを足して2にする。
+      const isTsumoSkip = this.getCurrentPlayer().playerId === playerId;
+      player.lockedTurns = isTsumoSkip ? 2 : 1;
     }
     this.playersWhoEverSkippedDobon.add(playerId);
+    // 演出は本人だけに見せる（相手には見逃しが分からない）
     this.minogashiPlayerName = player?.playerName;
+    this.minogashiPlayerId = playerId;
     this.minogashiRateApplied = true;
 
     if (this.dobonablePlayerIds.size === 0) {
