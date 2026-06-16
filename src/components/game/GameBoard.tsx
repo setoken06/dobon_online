@@ -477,15 +477,9 @@ export function GameBoard({
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
           {/* 中央に集中させる控えめなビネット */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,10,14,0.55),transparent_62%)]" />
-          <div className="relative flex flex-col items-center anim-announce">
-            <span className={`mb-4 h-[3px] w-14 rounded-full anim-announce-bar ${gameState.isDobonGaeshi ? 'bg-accent' : 'bg-danger'}`} />
-            <h1
-              className="text-5xl md:text-7xl font-semibold tracking-tight text-white"
-              style={{ textShadow: '0 4px 24px rgba(0,0,0,0.55)' }}
-            >
-              {announcement}
-            </h1>
-          </div>
+          <h1 className="relative announce-text anim-announce-zoom text-6xl md:text-8xl">
+            {announcement}
+          </h1>
         </div>
       )}
 
@@ -493,15 +487,9 @@ export function GameBoard({
       {minogashiText && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,10,14,0.5),transparent_62%)]" />
-          <div className="relative flex flex-col items-center anim-announce">
-            <span className="mb-4 h-[3px] w-14 rounded-full bg-[#e3b53b] anim-announce-bar" />
-            <h1
-              className="text-4xl md:text-6xl font-semibold tracking-tight text-white whitespace-pre-line text-center leading-[1.15]"
-              style={{ textShadow: '0 4px 24px rgba(0,0,0,0.55)' }}
-            >
-              {minogashiText}
-            </h1>
-          </div>
+          <h1 className="relative announce-text anim-announce-zoom text-4xl md:text-6xl whitespace-pre-line text-center leading-[1.2]">
+            {minogashiText}
+          </h1>
         </div>
       )}
 
@@ -610,10 +598,8 @@ export function GameBoard({
             {/* めくり演出テキスト */}
             {lastDrawAnnouncement && (
               <div className="flex flex-col items-center anim-announce">
-                <span className="mb-3 h-[3px] w-12 rounded-full bg-[#e3b53b] anim-announce-bar" />
                 {lastDrawAnnouncement.split('\n').map((line, i) => (
-                  <span key={i} className="block text-4xl md:text-5xl font-semibold tracking-tight text-white text-center leading-[1.15]"
-                    style={{ textShadow: '0 4px 24px rgba(0,0,0,0.55)' }}>
+                  <span key={i} className="block announce-text text-4xl md:text-5xl text-center leading-[1.25]">
                     {line}
                   </span>
                 ))}

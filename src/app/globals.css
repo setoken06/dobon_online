@@ -126,6 +126,27 @@ body {
 .anim-announce { animation: announceReveal 1.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .anim-announce-bar { animation: barReveal 1.9s cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: center; }
 
+/* パンチ系：中央で小さく出現→大きくオーバーシュート→定位→縮小して消える */
+@keyframes announceZoom {
+  0%   { opacity: 0; transform: scale(0.3); }
+  18%  { opacity: 1; transform: scale(1.35); }
+  32%  { transform: scale(1.0); }
+  70%  { opacity: 1; transform: scale(1.0); }
+  100% { opacity: 0; transform: scale(0.7); }
+}
+.anim-announce-zoom { animation: announceZoom 1.4s cubic-bezier(0.18, 1.1, 0.3, 1) both; transform-origin: center; }
+
+/* 白文字＋太い黒フチ（パンチ系の見出し）。フチはフォントサイズ比で太さ可変 */
+.announce-text {
+  font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  font-weight: 900;
+  color: #ffffff;
+  -webkit-text-stroke: 0.15em #0a0a0a;
+  paint-order: stroke fill;
+  filter: drop-shadow(2px 4px 0 rgba(0, 0, 0, 0.35));
+  letter-spacing: 0.02em;
+}
+
 .anim-fade-up { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .anim-pop { animation: popIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .anim-glow { animation: softGlow 1.8s ease-in-out infinite; }
