@@ -154,6 +154,25 @@ export function GameBoard({
     }
   }, [gameState.minogashiPlayerName]);
 
+  // パス＆リーチ継続/解除演出（パ継！/ パ解！）
+  const [passReachText, setPassReachText] = useState<string | null>(null);
+  const passReachTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevPassReachRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (gameState.passReachPlayerName && gameState.passReachPlayerName !== prevPassReachRef.current) {
+      prevPassReachRef.current = gameState.passReachPlayerName;
+      setPassReachText(gameState.passReachKept ? 'パ継！' : 'パ解！');
+      if (passReachTimerRef.current) clearTimeout(passReachTimerRef.current);
+      passReachTimerRef.current = setTimeout(() => {
+        setPassReachText(null);
+        passReachTimerRef.current = null;
+      }, 1600);
+    }
+    if (!gameState.passReachPlayerName) {
+      prevPassReachRef.current = undefined;
+    }
+  }, [gameState.passReachPlayerName, gameState.passReachKept]);
+
   const isWinnerPlayer = gameState.dobonWinnerPlayerIds?.includes(playerId);
   const revealedCount = gameState.revealedLastDrawCount || 0;
   // revealedCount >= totalCards * 2 = 全カード公開+確認完了（リザルト表示可能）
@@ -489,6 +508,16 @@ export function GameBoard({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,10,14,0.5),transparent_62%)]" />
           <h1 className="relative announce-text anim-announce-zoom text-4xl md:text-6xl whitespace-pre-line text-center leading-[1.2]">
             {minogashiText}
+          </h1>
+        </div>
+      )}
+
+      {/* パ継！/ パ解！演出（ドボンより小さめ） */}
+      {passReachText && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,10,14,0.45),transparent_62%)]" />
+          <h1 className="relative announce-text anim-announce-zoom text-3xl md:text-5xl">
+            {passReachText}
           </h1>
         </div>
       )}

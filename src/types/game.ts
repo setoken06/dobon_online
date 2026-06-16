@@ -87,6 +87,8 @@ export interface GameState {
   revealedLastDrawCount?: number;           // ラストドローで公開済みのカード数
   minogashiPlayerName?: string;             // 見逃し演出（ドボンスキップ時の演出）
   minogashiRateApplied?: boolean;           // 今回の見逃しでレート×2が適用されたか（初回のみtrue）
+  passReachPlayerName?: string;             // リーチ中にパスしたプレイヤー（パ継/パ解演出）
+  passReachKept?: boolean;                  // true=リーチ継続(パ継) / false=リーチ解除(パ解)
   displayCurrentPlayerId?: string;          // ターン表示用のプレイヤーID（ドボン透け対策のため実際のcurrentPlayerIdと異なる場合あり）
 }
 

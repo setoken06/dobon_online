@@ -39,6 +39,9 @@ export class GameManager {
   private rate: number;
   private minogashiPlayerName?: string; // 見逃し演出用
   private minogashiRateApplied?: boolean; // 直近の見逃しでレート×2が適用されたか
+  // パス時のリーチ継続/解除演出用
+  private passReachPlayerName?: string; // リーチ中にパスしたプレイヤー名
+  private passReachKept?: boolean;      // true=リーチ継続(パ継) / false=リーチ解除(パ解)
   private lastDrawCards: Card[] = [];
   // ドボン返し関連
   private dobonGaeshiEligiblePlayerIds: Set<string> = new Set();
@@ -543,6 +546,8 @@ export class GameManager {
       revealedLastDrawCount: this.dobonPhase === 'result' ? this.revealedLastDrawCount : undefined,
       minogashiPlayerName: this.minogashiPlayerName,
       minogashiRateApplied: this.minogashiRateApplied,
+      passReachPlayerName: this.passReachPlayerName,
+      passReachKept: this.passReachKept,
     };
   }
 
@@ -729,8 +734,10 @@ export class GameManager {
       return { success: false, error: 'そのカードは出せません' };
     }
 
-    // 見逃し演出をクリア
+    // 見逃し演出・パス演出をクリア
     this.minogashiPlayerName = undefined;
+    this.passReachPlayerName = undefined;
+    this.passReachKept = undefined;
 
     // カードを出す
     for (const card of cards) {
@@ -911,8 +918,10 @@ export class GameManager {
       }
     }
 
-    // 見逃し演出をクリア
+    // 見逃し演出・パス演出をクリア
     this.minogashiPlayerName = undefined;
+    this.passReachPlayerName = undefined;
+    this.passReachKept = undefined;
 
     this.refillDeckIfNeeded();
 
@@ -995,6 +1004,18 @@ export class GameManager {
       if (playableCards.length > 0) {
         return { success: false, error: '手札が8枚以上の場合、出せるカードがあればパスできません' };
       }
+    }
+
+    // パス時のリーチ継続/解除を判定して演出フラグを立てる
+    // - リーチ中にカードを出さずパス → 現在の手札でリーチ条件を再判定
+    //   継続なら「パ継！」、解除なら「パ解！」（リーチ状態も更新）
+    this.passReachPlayerName = undefined;
+    this.passReachKept = undefined;
+    if (currentPlayer.isReach) {
+      const stillReach = this.checkReachCondition(currentPlayer.hand);
+      currentPlayer.isReach = stillReach;
+      this.passReachPlayerName = currentPlayer.playerName;
+      this.passReachKept = stillReach;
     }
 
     this.nextTurn();
