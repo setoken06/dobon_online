@@ -45,6 +45,8 @@ export class GameManager {
   // パス時のリーチ継続/解除演出用
   private passReachPlayerName?: string; // リーチ中にパスしたプレイヤー名
   private passReachKept?: boolean;      // true=リーチ継続(パ継) / false=リーチ解除(パ解)
+  // リーチ成立演出用（リーチ状態になった瞬間に表示。全員に見える）
+  private reachPlayerName?: string;
   private lastDrawCards: Card[] = [];
   // ドボン返し関連
   private dobonGaeshiEligiblePlayerIds: Set<string> = new Set();
@@ -564,6 +566,7 @@ export class GameManager {
       isLocked: (player?.lockedTurns ?? 0) > 0,
       passReachPlayerName: this.passReachPlayerName,
       passReachKept: this.passReachKept,
+      reachPlayerName: this.reachPlayerName,
     };
   }
 
@@ -755,13 +758,15 @@ export class GameManager {
       return { success: false, error: 'そのカードは出せません' };
     }
 
-    // 見逃し演出・パス演出をクリア
+    // 見逃し演出・パス演出・リーチ演出をクリア
     this.minogashiPlayerName = undefined;
     this.minogashiPlayerId = undefined;
     this.passReachPlayerName = undefined;
     this.passReachKept = undefined;
+    this.reachPlayerName = undefined;
 
     // カードを出す
+    const wasReach = currentPlayer.isReach;
     for (const card of cards) {
       const cardIndex = currentPlayer.hand.findIndex(c => c.id === card.id);
       currentPlayer.hand.splice(cardIndex, 1);
@@ -776,6 +781,10 @@ export class GameManager {
       currentPlayer.isReach = true;
     } else {
       currentPlayer.isReach = false;
+    }
+    // リーチに「なった瞬間」だけ演出（false → true）
+    if (!wasReach && currentPlayer.isReach) {
+      this.reachPlayerName = currentPlayer.playerName;
     }
 
     // UNOモード: カード効果を適用（ドロー2/スキップ/リバース/ドロー4）
@@ -939,11 +948,12 @@ export class GameManager {
       }
     }
 
-    // 見逃し演出・パス演出をクリア
+    // 見逃し演出・パス演出・リーチ演出をクリア
     this.minogashiPlayerName = undefined;
     this.minogashiPlayerId = undefined;
     this.passReachPlayerName = undefined;
     this.passReachKept = undefined;
+    this.reachPlayerName = undefined;
 
     this.refillDeckIfNeeded();
 

@@ -89,6 +89,7 @@ export interface GameState {
   minogashiRateApplied?: boolean;           // 今回の見逃しでレート×2が適用されたか（初回のみtrue）
   passReachPlayerName?: string;             // リーチ中にパスしたプレイヤー（パ継/パ解演出）
   passReachKept?: boolean;                  // true=リーチ継続(パ継) / false=リーチ解除(パ解)
+  reachPlayerName?: string;                 // リーチ成立したプレイヤー（リーチ！演出）
   isLocked?: boolean;                       // 自分が見逃しロック中か（カードを出せない・ドボン不可）
   displayCurrentPlayerId?: string;          // ターン表示用のプレイヤーID（ドボン透け対策のため実際のcurrentPlayerIdと異なる場合あり）
 }

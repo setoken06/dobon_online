@@ -173,6 +173,25 @@ export function GameBoard({
     }
   }, [gameState.passReachPlayerName, gameState.passReachKept]);
 
+  // リーチ成立演出（リーチ！）
+  const [reachText, setReachText] = useState<string | null>(null);
+  const reachTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevReachRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (gameState.reachPlayerName && gameState.reachPlayerName !== prevReachRef.current) {
+      prevReachRef.current = gameState.reachPlayerName;
+      setReachText('リーチ！');
+      if (reachTimerRef.current) clearTimeout(reachTimerRef.current);
+      reachTimerRef.current = setTimeout(() => {
+        setReachText(null);
+        reachTimerRef.current = null;
+      }, 1600);
+    }
+    if (!gameState.reachPlayerName) {
+      prevReachRef.current = undefined;
+    }
+  }, [gameState.reachPlayerName]);
+
   const isWinnerPlayer = gameState.dobonWinnerPlayerIds?.includes(playerId);
   const revealedCount = gameState.revealedLastDrawCount || 0;
   // revealedCount >= totalCards * 2 = 全カード公開+確認完了（リザルト表示可能）
@@ -518,6 +537,16 @@ export function GameBoard({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,10,14,0.45),transparent_62%)]" />
           <h1 className="relative announce-text anim-announce-zoom text-3xl md:text-5xl">
             {passReachText}
+          </h1>
+        </div>
+      )}
+
+      {/* リーチ！演出（パ継/パ解と同じ） */}
+      {reachText && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,10,14,0.45),transparent_62%)]" />
+          <h1 className="relative announce-text anim-announce-zoom text-3xl md:text-5xl">
+            {reachText}
           </h1>
         </div>
       )}
