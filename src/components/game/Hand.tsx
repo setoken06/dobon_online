@@ -12,14 +12,20 @@ interface HandProps {
   playableCardIds: Set<string>;
   onCardSelect: (cardId: string) => void;
   exposedCardIds?: Set<string>; // 見逃しで表側公開されている自分のカードID
+  stock?: number;               // 自分のストック
 }
 
-export function Hand({ cards, topCard, isMyTurn, hasDrawn, selectedCardIds, playableCardIds, onCardSelect, exposedCardIds }: HandProps) {
+export function Hand({ cards, topCard, isMyTurn, hasDrawn, selectedCardIds, playableCardIds, onCardSelect, exposedCardIds, stock = 0 }: HandProps) {
   return (
     <div className="rounded-2xl border border-white/8 bg-white/[0.03] backdrop-blur-sm p-4">
       <div className="flex items-center gap-2 mb-3">
         <span className="text-white/65 text-xs font-medium tracking-wide">あなたの手札</span>
         <span className="text-white/45 text-xs tabular-nums">{cards.length}枚</span>
+        {stock > 0 && (
+          <span className="bg-[#c9483f] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums">
+            ストック{stock}
+          </span>
+        )}
       </div>
       <div className="flex flex-wrap gap-2 justify-center min-h-[100px]">
         {cards.map((card) => {

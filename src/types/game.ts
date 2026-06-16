@@ -7,6 +7,7 @@ export interface PlayerGameState {
   cardCount: number;    // 他プレイヤーには枚数のみ公開
   hand?: Card[];        // 自分の手札のみ含まれる
   isReach: boolean;     // リーチ状態
+  stock?: number;       // 見逃しで貯まったストック（名前と一緒に常時表示）
   exposedCards?: Card[];// 見逃しで表側公開された手札（全員に見える公開情報）
 }
 

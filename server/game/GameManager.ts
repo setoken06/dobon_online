@@ -10,6 +10,8 @@ interface InternalPlayerState {
   hand: Card[];
   isReach: boolean;
   myMark?: MyMark;
+  // 見逃しで貯まるストック（上がった時にラストドロー枚数が +stock される）
+  stock: number;
   // 見逃しで表側公開された手札のカードID（捨てられるまで公開され続ける）
   exposedCardIds: Set<string>;
 }
@@ -34,7 +36,7 @@ export class GameManager {
   private playersWhoDoboned: Map<string, DobonPlayerInfo> = new Map();
   private playersWhoSkippedDobon: Set<string> = new Set();
   // ゲーム全体を通して見逃しを1回以上した経験のあるプレイヤー（参考用）
-  // レート×2は見逃すたびに毎回適用（無制限）
+  // 見逃しはストック制：見逃すたびにそのプレイヤーのストック +1
   private playersWhoEverSkippedDobon: Set<string> = new Set();
   private rate: number;
   private minogashiPlayerName?: string; // 見逃し演出用
@@ -85,6 +87,7 @@ export class GameManager {
       hand: [],
       isReach: false,
       myMark: p.myMark,
+      stock: 0,
       exposedCardIds: new Set<string>(),
     }));
 
@@ -466,6 +469,8 @@ export class GameManager {
       cardCount: p.hand.length,
       hand: p.playerId === playerId || winnerPlayerIdSet?.has(p.playerId) ? p.hand : undefined,
       isReach: p.isReach,
+      // 見逃しストック（プレイヤー名と一緒に常時表示する）
+      stock: p.stock,
       // 表側公開された手札（全員に見える公開情報）。相手のはこれだけ表向きで描画する。
       exposedCards: p.hand.filter(c => p.exposedCardIds.has(c.id)),
     }));
@@ -1048,8 +1053,7 @@ export class GameManager {
   }
 
   // ドボンをスキップ（見逃し）
-  // 1ゲームにつき各プレイヤー1回目の見逃しのみレート×2、2回目以降はレート据え置き
-  // 2ドロー（全員）は毎回適用
+  // ストック制：見逃すたびにストック+1＋手札を表側公開（旧レート×2は廃止）
   skipDobon(playerId: string): { success: boolean; error?: string; allResponded?: boolean } {
     if (!this.dobonablePlayerIds.has(playerId)) {
       return { success: false, error: 'ドボンの権利がありません' };
@@ -1060,15 +1064,16 @@ export class GameManager {
     this.dobonablePlayerIds.delete(playerId);
 
     // 見逃し:
+    // ストック制（旧レート×2は廃止）:
+    // - 見逃すたびにそのプレイヤーのストック +1
     // - 手札公開は毎回（見逃した瞬間の手札を表側に。追加で引くカードは対象外、捨てるとリセット）
-    // - レート×2 は見逃すたびに毎回（無制限・初回限定ではない）
     if (player) {
+      player.stock += 1;
       for (const c of player.hand) {
         player.exposedCardIds.add(c.id);
       }
     }
     this.playersWhoEverSkippedDobon.add(playerId);
-    this.rate *= 2;
     this.minogashiPlayerName = player?.playerName;
     this.minogashiRateApplied = true;
 
@@ -1326,8 +1331,17 @@ export class GameManager {
       }
     };
 
+    // 上がったプレイヤーのストック分だけ「本カード（非ジョーカー）」の枚数を増やす。
+    // デフォルト1枚 + ストック数。複数勝者（ダブルドボン等）は最大ストックを採用。
+    const winnerStock = this.pendingDobonWinners.reduce((mx, w) => {
+      const p = this.findPlayer(w.playerId);
+      return Math.max(mx, p?.stock ?? 0);
+    }, 0);
+    const targetNonJoker = 1 + winnerStock;
+
     refillForLastDraw();
 
+    let nonJokerCount = 0;
     let lastDrawCard = this.deck.draw();
     while (lastDrawCard) {
       this.lastDrawCards.push(lastDrawCard);
@@ -1335,13 +1349,15 @@ export class GameManager {
       const isJokerLike = this.gameMode === 'uno' ? isWildCard(lastDrawCard) : isJokerCard(lastDrawCard);
 
       if (isJokerLike) {
-        // ジョーカー/ワイルドならレート*2してもう一枚引く
+        // ジョーカー/ワイルドならレート×2（本カードにはカウントしない）
         this.rate *= 2;
-        refillForLastDraw();
-        lastDrawCard = this.deck.draw();
       } else {
-        break;
+        nonJokerCount += 1;
+        if (nonJokerCount >= targetNonJoker) break;
       }
+
+      refillForLastDraw();
+      lastDrawCard = this.deck.draw();
     }
 
     // フォールバック: 山札も捨て札も全て手札にあって空のまま終わった場合、
