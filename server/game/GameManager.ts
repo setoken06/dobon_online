@@ -1343,21 +1343,9 @@ export class GameManager {
   private performLastDraw(): void {
     this.lastDrawCards = [];
 
-    // ラストドロー専用リフィル: 山札が空なら捨て札を山札に戻して引き直す。
-    // 「今ドボンされた一番上のカード」はラストドローで使い回さないよう、捨て札が2枚以上
-    // あればそれを残して、それ以外を山札に戻す（同じカードがめくれるのを防ぐ）。
-    // 捨て札が1枚（＝そのカードのみ）しか無い場合は、他に札が無いのでそれも戻して引く。
-    const refillForLastDraw = () => {
-      if (!this.deck.isEmpty() || this.discardPile.length === 0) return;
-      if (this.discardPile.length > 1) {
-        const top = this.discardPile.pop()!;
-        this.deck.addCards(this.discardPile); // addCards 内でシャッフル
-        this.discardPile = [top];
-      } else {
-        this.deck.addCards(this.discardPile);
-        this.discardPile = [];
-      }
-    };
+    // 山札が空なら、ゲーム中と同じリセット（場札を残して残りを山札へ戻す）を使う。
+    // → ラストドローでも refillDeckIfNeeded を使い回す。場札＝今ドボンされたカードは
+    //   山札に戻さず残るので、同じカードがめくれることはない。
 
     // 上がったプレイヤーのストック分だけ「本カード（非ジョーカー）」の枚数を増やす。
     // デフォルト1枚 + ストック数。複数勝者（ダブルドボン等）は最大ストックを採用。
@@ -1367,7 +1355,7 @@ export class GameManager {
     }, 0);
     const targetNonJoker = 1 + winnerStock;
 
-    refillForLastDraw();
+    this.refillDeckIfNeeded();
 
     let nonJokerCount = 0;
     let lastDrawCard = this.deck.draw();
@@ -1384,7 +1372,7 @@ export class GameManager {
         if (nonJokerCount >= targetNonJoker) break;
       }
 
-      refillForLastDraw();
+      this.refillDeckIfNeeded();
       lastDrawCard = this.deck.draw();
     }
 
