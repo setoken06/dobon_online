@@ -1343,13 +1343,19 @@ export class GameManager {
   private performLastDraw(): void {
     this.lastDrawCards = [];
 
-    // ラストドロー専用の積極的リフィル: ゲーム終了処理なのでトップカード温存は不要
-    // → 山札が空なら捨て札を全部山札へ（discardPileに1枚しかない場合でも取り込む）
+    // ラストドロー専用リフィル: 山札が空なら捨て札を山札に戻して引き直す。
+    // 「今ドボンされた一番上のカード」はラストドローで使い回さないよう、捨て札が2枚以上
+    // あればそれを残して、それ以外を山札に戻す（同じカードがめくれるのを防ぐ）。
+    // 捨て札が1枚（＝そのカードのみ）しか無い場合は、他に札が無いのでそれも戻して引く。
     const refillForLastDraw = () => {
-      if (this.deck.isEmpty() && this.discardPile.length > 0) {
+      if (!this.deck.isEmpty() || this.discardPile.length === 0) return;
+      if (this.discardPile.length > 1) {
+        const top = this.discardPile.pop()!;
+        this.deck.addCards(this.discardPile); // addCards 内でシャッフル
+        this.discardPile = [top];
+      } else {
         this.deck.addCards(this.discardPile);
         this.discardPile = [];
-        this.deck.shuffle();
       }
     };
 
