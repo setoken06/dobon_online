@@ -3,6 +3,9 @@ import { GameState, PlayerGameState, GAME_CONFIG, WinnerInfo, InitialRateBonus, 
 import { Player, MyMark } from '../../src/types/room';
 import { Deck } from './Deck';
 
+// 見逃しルール（ドボンを見逃すとストック+1・1ターンロック）。2026-10-22 オフ。戻すときは true に
+const MINOGASHI_RULE = false;
+
 interface InternalPlayerState {
   playerId: string;
   sessionId: string;
@@ -1090,6 +1093,14 @@ export class GameManager {
     const player = this.findPlayer(playerId);
     this.playersWhoSkippedDobon.add(playerId);
     this.dobonablePlayerIds.delete(playerId);
+
+    // 見逃しルールがオフなら、ただのスキップ（ストック・ロック・演出なし）
+    if (!MINOGASHI_RULE) {
+      if (this.dobonablePlayerIds.size === 0) {
+        return this.resolveDobonPhase();
+      }
+      return { success: true, allResponded: false };
+    }
 
     // 見逃し:
     // 見逃し（相手には不可視）:
