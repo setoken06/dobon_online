@@ -1256,19 +1256,20 @@ export class GameManager {
   private calculateFinalScores(): void {
     // ラストドローの「本カード（非ジョーカー）」を全部評価して合計する。
     // 各カードの実効値はカード値。ただし「2枚上がり」の時のみ、値1のカードはワースト -25。
-    // （ワーストは2枚上がり限定。他の上がり枚数では値1も単に値1として加算）
+    // （ワーストは2枚上がり限定。他の上がり枚数では値1も単に値1として加算。ドボン返しでの上がりはワースト無効）
     const nonJokerCards = this.gameMode === 'uno'
       ? this.lastDrawCards.filter(c => !isWildCard(c))
       : this.lastDrawCards.filter(c => !isJokerCard(c));
     const cardValueOf = (c: Card) =>
       this.gameMode === 'uno' ? this.getLastDrawCardValue(c) : this.getCardValue(c);
     // 上がり枚数に応じた合計実効値とワースト判定（ワーストは handCount===2 のみ）
-    const evalFor = (handCount: number): { sum: number; worst: boolean } => {
+    // ドボン返しで上がったときはワーストを無効にする（値1は単に1として加算）
+    const evalFor = (handCount: number, allowWorst = true): { sum: number; worst: boolean } => {
       let sum = 0;
       let worst = false;
       for (const c of nonJokerCards) {
         const v = cardValueOf(c);
-        if (handCount === 2 && v === 1) {
+        if (allowWorst && handCount === 2 && v === 1) {
           sum += -25;
           worst = true;
         } else {
@@ -1280,7 +1281,7 @@ export class GameManager {
 
     if (this.pendingDobonIsGaeshi && this.pendingGaeshiTotalMultiplier !== undefined) {
       const gaeshiWinner = this.pendingDobonWinners[0];
-      const { sum, worst } = evalFor(gaeshiWinner.handCount);
+      const { sum, worst } = evalFor(gaeshiWinner.handCount, false);
       const score = this.rate * sum * this.pendingGaeshiTotalMultiplier;
       this.winners = [{
         playerId: gaeshiWinner.playerId,
