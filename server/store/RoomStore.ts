@@ -111,13 +111,15 @@ export class RoomStore {
   // 対戦履歴を記録（メモリ上のみ、部屋削除で消失）
   // 同一ゲームに対して複数の終了経路（advanceDobonPhase / backToLobby）から
   // 呼ばれても多重記録しないよう冪等にしている。
-  recordGameHistory(roomId: string, game: GameManager): void {
+  // 新しく記録したときだけ entry を返す（記録済み・勝者なしなら null）。
+  // 戻り値を使って「ちょうど1回だけ」結果通知を出せる。
+  recordGameHistory(roomId: string, game: GameManager): GameHistoryEntry | null {
     const room = this.rooms.get(roomId);
-    if (!room) return;
-    if (this.recordedGames.has(game)) return; // 記録済みならスキップ
+    if (!room) return null;
+    if (this.recordedGames.has(game)) return null; // 記録済みならスキップ
     const winnerInfo = game.getWinner();
     const winners = winnerInfo.winners;
-    if (!winners || winners.length === 0) return;
+    if (!winners || winners.length === 0) return null;
     const loser = game.getLoser();
     const totalScore = winners.reduce((s, w) => s + w.finalScore, 0);
     const isOnanii = !!(loser?.isTsumoDobon && winners.length > 0 && loser.playerId === winners[0].playerId);
@@ -134,6 +136,7 @@ export class RoomStore {
     if (!room.gameHistory) room.gameHistory = [];
     room.gameHistory.push(entry);
     this.recordedGames.add(game);
+    return entry;
   }
 
   // セッションIDでプレイヤーを検索

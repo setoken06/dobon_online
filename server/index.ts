@@ -11,6 +11,7 @@ import {
 import { roomStore } from './store/RoomStore';
 import { Player } from '../src/types/room';
 import { GameManager } from './game/GameManager';
+import { notifyGameResult } from './notify';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';  // 本番環境では0.0.0.0にバインド
@@ -443,7 +444,8 @@ app.prepare().then(() => {
           const { winnerId, winnerName } = game.getWinner();
           if (winnerId && winnerName) {
             // 対戦履歴を記録（セッション内のみ、永続化なし）
-            roomStore.recordGameHistory(roomId, game);
+            const entry = roomStore.recordGameHistory(roomId, game);
+            if (entry) notifyGameResult(entry); // Discordへ結果通知（投げっぱなし）
             io.to(roomId).emit('game:finished', { winnerId, winnerName });
             roomStore.setRoomStatus(roomId, 'finished');
             // 更新された履歴を含む部屋情報をブロードキャスト
@@ -547,7 +549,8 @@ app.prepare().then(() => {
         // 待機画面に戻る操作は必ず行われるので、この経路で取りこぼしを防ぐ。
         const finishedGame = roomStore.getGame(roomId);
         if (finishedGame) {
-          roomStore.recordGameHistory(roomId, finishedGame);
+          const entry = roomStore.recordGameHistory(roomId, finishedGame);
+          if (entry) notifyGameResult(entry); // Discordへ結果通知（取りこぼし防止）
         }
 
         // ゲームを削除して待機状態に戻す

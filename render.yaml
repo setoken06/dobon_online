@@ -7,3 +7,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # 対戦結果の通知先（Discord webhook）。値はダッシュボードで設定（リポジトリには保存しない）
+      - key: DISCORD_RESULT_WEBHOOK
+        sync: false
