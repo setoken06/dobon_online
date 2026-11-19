@@ -4,6 +4,7 @@ import { useSocket } from '../hooks/useSocket';
 import { RoomForm } from '../components/lobby/RoomForm';
 import { PlayerList } from '../components/lobby/PlayerList';
 import { GameBoard } from '../components/game/GameBoard';
+import { ChatPanel } from '../components/ChatPanel';
 
 export default function Home() {
   const {
@@ -127,6 +128,7 @@ export default function Home() {
           onChooseColor={chooseColor}
           onRevealLastDrawCard={revealLastDrawCard}
         />
+        <ChatPanel roomId={room.id} playerId={playerId} />
       </>
     );
   }
@@ -143,6 +145,7 @@ export default function Home() {
           onStartGame={startGame}
           onLeaveRoom={leaveRoom}
         />
+        <ChatPanel roomId={room.id} playerId={playerId} />
       </>
     );
   }

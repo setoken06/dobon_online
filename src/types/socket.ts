@@ -2,6 +2,15 @@ import { Card, Suit, GameMode, UnoColor } from './card';
 import { Room, Player } from './room';
 import { GameState } from './game';
 
+// 部屋の中のチャット1件
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  playerName: string;
+  text: string;
+  timestamp: number;
+}
+
 // クライアント → サーバー
 export interface ClientToServerEvents {
   'room:create': (data: { roomId: string; playerName: string; sessionId: string; jokerCount?: number; rate?: number; myMark: Suit; gameMode?: GameMode }) => void;
@@ -21,6 +30,7 @@ export interface ClientToServerEvents {
   'game:advanceDobonPhase': (data: { roomId: string }) => void;
   'game:chooseColor': (data: { roomId: string; color: UnoColor }) => void;
   'game:revealLastDrawCard': (data: { roomId: string }) => void;
+  'chat:send': (data: { roomId: string; text: string }) => void;
 }
 
 // サーバー → クライアント
@@ -43,6 +53,7 @@ export interface ServerToClientEvents {
   'game:finished': (data: { winnerId: string; winnerName: string }) => void;
   'game:backToLobby': () => void;
   'game:error': (data: { message: string }) => void;
+  'chat:message': (data: ChatMessage) => void;
 }
 
 // Socket.ioの型付きソケット用

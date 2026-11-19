@@ -323,7 +323,7 @@ export function GameBoard({
   }, [selectedCardIds, myPlayer?.hand, gameState.topCard, gameState.effectiveTopCard]);
 
   return (
-    <div className="felt-bg min-h-screen p-4 flex flex-col">
+    <div className="felt-bg min-h-screen p-4 pb-24 flex flex-col">
       {/* 結果モーダル（ドボン演出を経由した場合はドボンリザルトフェーズで表示済みなので非表示） */}
       {isFinished && gameState.winnerName && !gameState.winners && (
         <GameResult

@@ -565,6 +565,29 @@ app.prepare().then(() => {
       }
     });
 
+    // 部屋の中のチャット（対戦中も待機中も使える）
+    socket.on('chat:send', ({ roomId, text }) => {
+      try {
+        // 送信者がその部屋にいることを確認（なりすまし・部屋外からの送信を防ぐ）
+        if (!roomId || socket.data.roomId !== roomId) return;
+        const room = roomStore.getRoom(roomId);
+        if (!room) return;
+        const player = room.players.find((p) => p.id === socket.id);
+        const name = player?.name || socket.data.playerName || '???';
+        const clean = String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (!clean) return;
+        io.to(roomId).emit('chat:message', {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          playerId: socket.id,
+          playerName: name,
+          text: clean,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        // チャットの失敗はゲームに影響させない
+      }
+    });
+
     // 切断時（タブ切り替えなど）- 復帰可能な離席扱い
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);

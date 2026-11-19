@@ -69,7 +69,7 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
   const hasStats = pairSummary.length > 0 || hasHistory;
 
   return (
-    <div className="app-bg min-h-screen flex flex-col items-center justify-center p-6">
+    <div className="app-bg min-h-screen flex flex-col items-center justify-center p-6 pb-24">
       <div className="w-full max-w-3xl anim-fade-up">
         {/* ヘッダー: ルームID + モード */}
         <div className="flex items-center justify-between mb-4 px-1">
