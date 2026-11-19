@@ -90,9 +90,9 @@ export function ChatPanel({ roomId, playerId }: ChatPanelProps) {
         })}
       </div>
 
-      {/* フッター固定の入力欄 */}
+      {/* フッター固定の入力欄（背景は不透明＝下のゲームが透けない） */}
       <div
-        className="pointer-events-auto flex items-center gap-2 px-3 py-2 bg-surface/95 backdrop-blur border-t border-line"
+        className="pointer-events-auto flex items-center gap-2 px-3 py-2 bg-surface border-t border-line"
         style={{ paddingBottom: kbOffset > 0 ? 8 : 'calc(8px + env(safe-area-inset-bottom))' }}
       >
         <input
@@ -102,7 +102,10 @@ export function ChatPanel({ roomId, playerId }: ChatPanelProps) {
           onKeyDown={onKeyDown}
           maxLength={200}
           placeholder="入力..."
-          className="flex-1 min-w-0 px-4 py-2 rounded-full border border-line bg-surface-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent"
+          enterKeyHint="send"
+          // iOSでフォーカス時に画面が勝手にズームするのを防ぐため16px固定
+          style={{ fontSize: 16 }}
+          className="flex-1 min-w-0 px-4 py-2 rounded-full border border-line bg-surface-2 text-ink placeholder:text-muted focus:outline-none focus:border-accent"
         />
         <button
           onClick={send}
