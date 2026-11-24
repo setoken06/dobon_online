@@ -60,6 +60,8 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
   const isHost = room.hostId === playerId;
   const canStart = room.players.length >= room.minPlayers;
   const pairSummary = room.gameHistory ? computePairSummary(room.gameHistory) : [];
+  // 全体の総移動額（相殺なし＝全方向の合計）
+  const totalFlow = pairSummary.reduce((s, p) => s + p.net, 0);
 
   const hasHistory = !!(room.gameHistory && room.gameHistory.length > 0);
   const hasStats = pairSummary.length > 0 || hasHistory;
@@ -173,6 +175,10 @@ export function PlayerList({ room, playerId, disconnectedPlayers, onStartGame, o
             {pairSummary.length > 0 && (
               <div className="mb-5">
                 <h3 className="text-sm font-semibold text-ink-soft mb-2.5">総合成績</h3>
+                <div className="rounded-xl border border-line bg-surface-2 px-4 py-3 mb-2 flex items-center justify-between">
+                  <span className="text-sm text-ink-soft font-medium">全体の総移動額</span>
+                  <span className="font-bold text-lg text-accent-ink tabular-nums">{totalFlow.toLocaleString()} EVJ</span>
+                </div>
                 <div className="rounded-xl border border-line bg-surface-2 p-2 space-y-1">
                   {pairSummary.map((p, i) => (
                     <div
