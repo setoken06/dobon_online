@@ -10,23 +10,21 @@ interface PlayerListProps {
   onLeaveRoom: () => void;
 }
 
-// 対戦履歴からプレイヤー間の純フロー（個人間総合成績）を算出
-// - 同じ A→B が複数あれば加算
-// - A→B と B→A は相殺
+// 対戦履歴からプレイヤー間の総移動額（個人間総合成績）を算出
+// - 同じ A→B（勝者→敗者）が複数あれば加算
+// - A→B と B→A は相殺しない（各方向の合計をそのまま出す）
 // - 異なるペア（A→B と A→C）は別カウント
 function computePairSummary(history: GameHistoryEntry[]): { from: string; to: string; net: number }[] {
-  const pairs = new Map<string, { playerA: string; playerB: string; netAtoB: number }>();
+  // キー = `勝者\u0000敗者`。方向ごとに総額を加算（相殺なし）
+  const flows = new Map<string, { from: string; to: string; total: number }>();
 
   // winner が loser から amount を受け取る関係を加算
   const addFlow = (winnerName: string, loserName: string, amount: number) => {
     if (winnerName === loserName || amount === 0) return;
-    const sorted = [winnerName, loserName].sort();
-    const key = `${sorted[0]}\u0000${sorted[1]}`;
-    // winner が playerA(辞書順小) なら + amount、playerB なら - amount
-    const delta = winnerName === sorted[0] ? amount : -amount;
-    const cur = pairs.get(key) ?? { playerA: sorted[0], playerB: sorted[1], netAtoB: 0 };
-    cur.netAtoB += delta;
-    pairs.set(key, cur);
+    const key = `${winnerName}\u0000${loserName}`;
+    const cur = flows.get(key) ?? { from: winnerName, to: loserName, total: 0 };
+    cur.total += amount;
+    flows.set(key, cur);
   };
 
   for (const entry of history) {
@@ -50,10 +48,8 @@ function computePairSummary(history: GameHistoryEntry[]): { from: string; to: st
   }
 
   const out: { from: string; to: string; net: number }[] = [];
-  for (const { playerA, playerB, netAtoB } of pairs.values()) {
-    if (netAtoB > 0) out.push({ from: playerA, to: playerB, net: netAtoB });
-    else if (netAtoB < 0) out.push({ from: playerB, to: playerA, net: -netAtoB });
-    // 完全に相殺された(0)ペアは省略
+  for (const { from, to, total } of flows.values()) {
+    if (total > 0) out.push({ from, to, net: total });
   }
   // 移動額の大きい順
   out.sort((a, b) => b.net - a.net);
